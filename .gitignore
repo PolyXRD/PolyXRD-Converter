@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+installer_output/
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+*_report.txt
+*.tmp
+Thumbs.db

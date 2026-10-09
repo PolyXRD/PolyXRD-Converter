@@ -1,0 +1,411 @@
+"""把真实样本全量跑一遍, 交叉校验 RAW 解析结果。
+
+可直接跑: python tests/validate_samples.py
+"""
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from polyxrd_converter.loader import detect_format, load_pattern  # noqa: E402
+from polyxrd_converter.raw_formats import detect_raw_parser  # noqa: E402
+
+OK, FAIL = [], []
+
+
+def check(cond: bool, msg: str) -> None:
+    if cond and os.environ.get("VERBOSE"):
+        print("  ✓", msg)
+    (OK if cond else FAIL).append(msg)
+
+
+def load_text_pairs(d: Path) -> dict[str, np.ndarray]:
+    """把目录里的两列文本 (.txt) 读成 {主名: (x, y)}。"""
+    from polyxrd_converter.loader import _load_text
+
+    out = {}
+    for f in d.glob("*.txt"):
+        try:
+            data = _load_text(f, "txt")
+            out[f.stem] = np.column_stack([data.two_theta, data.intensity])
+        except Exception:
+            pass
+    for f in d.glob("*.TXT"):
+        try:
+            data = _load_text(f, "txt")
+            out[f.stem] = np.column_stack([data.two_theta, data.intensity])
+        except Exception:
+            pass
+    return out
+
+
+# ---------------------------------------------------------------- Rigaku FI
+#: 已知异常样本: 文件头里的 (end, step) 是坏的 (end=195° > 180°), 真值是 2θ 15→70°,
+#: 275 点。parser 会把它标成"角度轴不可信"并拒绝自动转换, 这里显式断言该行为。
+KNOWN_BAD_AXIS = {"data006：AlCoO-750C"}
+
+
+def validate_rigaku(base: Path) -> None:
+    print("\n=== 1) Rigaku FI (XRData/csuHJW) ===")
+    raws = sorted(base.glob("*.raw"))
+    if not raws:
+        print("  样本目录不存在, 跳过"); return
+    txts = load_text_pairs(base)
+    n_fi = 0
+    for rp in raws:
+        magic = rp.read_bytes()[:4]
+        parser = detect_raw_parser(rp.read_bytes())
+        if parser.key != "rigaku_raw":
+            print(f"  [skip] {rp.name[:28]:30s} magic={magic!r} -> {parser.key}")
+            continue
+        n_fi += 1
+        try:
+            d = load_pattern(rp)
+        except Exception as e:
+            check(False, f"FI {rp.name}: 读取失败 {e}")
+            continue
+
+        if rp.stem in KNOWN_BAD_AXIS:
+            check(d.metadata.get("axis_confident") is False,
+                  f"FI {rp.name[:26]}: 头中轴参数已损坏, 已正确标记为不可信")
+            try:
+                load_pattern(rp) and None
+            except Exception:
+                pass
+            # 自动转换必须被拦住
+            try:
+                from polyxrd_converter.converter import convert_file
+                convert_file(rp, rp.with_suffix(".xy"))
+                check(False, f"FI {rp.name[:26]}: 轴不可信时竟然允许自动转换")
+            except Exception:
+                check(True, f"FI {rp.name[:26]}: 轴不可信时已拒绝自动转换 (要求人工指定)")
+            continue
+
+        twin = txts.get(rp.stem)
+        if twin is not None and twin.shape[0] == len(d):
+            dx = np.max(np.abs(twin[:, 0] - d.two_theta))
+            dy = np.max(np.abs(twin[:, 1] - d.intensity))
+            check(dx < 5e-4 and dy < 1e-6,
+                  f"FI {rp.name[:26]}: 与 .txt 逐点一致 (n={len(d)}, dx={dx:.2e}, dy={dy:.2e})")
+        else:
+            check(d.metadata.get("axis_confident") is True and len(d) > 100,
+                  f"FI {rp.name[:26]}: n={len(d)} x=[{d.two_theta[0]:.3f},{d.two_theta[-1]:.3f}]")
+    print(f"  FI 样本 {n_fi} 个")
+
+
+# ---------------------------------------------------------------- 手动定轴
+def validate_manual_axis(base: Path) -> None:
+    """data006 自动定轴失败 → 人工给 (起始 2θ, 步长) 后必须与真值对齐。"""
+    print("\n=== 1b) 手动指定角度轴 (data006 回归) ===")
+    rp = base / "data006：AlCoO-750C.raw"
+    tp = base / "data006：AlCoO-750C.TXT"
+    if not rp.exists() or not tp.exists():
+        print("  样本不存在, 跳过"); return
+
+    from polyxrd_converter.loader import _read_numeric_rows
+
+    # data006.TXT 是 MDI 风格 (8F7 单列强度 + 头), 需按行拆出全部数值, 再按个数定长
+    all_rows, _lines = _read_numeric_rows(tp)
+    y_txt = np.array([v for row in all_rows for v in row], dtype=float)
+    x_txt = 15.0 + 0.025 * np.arange(len(y_txt))
+
+    n = len(load_pattern(rp))               # 275
+    step = (70.0 - 15.0) / (n - 1)
+    d = load_pattern(rp, manual_axis=(15.0, step))
+    check(d.metadata.get("axis_confident") is True and d.metadata.get("axis_source") == "manual",
+          "data006: 手动定轴后 axis_confident=True")
+
+    # 手工轴下 raw 的峰位应与 txt 对齐 (逐点形状相关)
+    m = d.two_theta <= x_txt[-1] + 0.5
+    yi = np.interp(d.two_theta[m], x_txt, y_txt)
+    corr = float(np.corrcoef(yi, d.intensity[m])[0, 1]) if m.sum() > 5 else float("nan")
+    check(corr > 0.9, f"data006: 手动定轴后与同名 .TXT 形状相关 {corr:.3f} (>0.9)")
+
+
+# ---------------------------------------------------------------- Scintag RAW2
+def validate_raw2(dirs: list[Path]) -> None:
+    print("\n=== 2) Scintag RAW2 ===")
+    seen: set[str] = set()
+    total = 0
+    for d in dirs:
+        if not d.is_dir():
+            continue
+        for rp in sorted(d.iterdir()):
+            low = rp.name.lower()
+            if not low.endswith(".raw") or low in seen:
+                continue
+            seen.add(low)
+            if rp.read_bytes()[:4] != b"RAW2":
+                continue
+            total += 1
+            try:
+                dd = load_pattern(rp)
+            except Exception as e:
+                check(False, f"RAW2 {rp.name}: 读取失败 {e}")
+                continue
+            check(len(dd) > 100 and 0 <= dd.two_theta[0] < dd.two_theta[-1] <= 180,
+                  f"RAW2 {str(d.name)}/{rp.name[:18]:20s} n={len(dd):5d} "
+                  f"x=[{dd.two_theta[0]:.3f},{dd.two_theta[-1]:.3f}] ymax={dd.intensity.max():.0f}")
+    print(f"  RAW2 样本 {total} 个")
+
+    # 与同目录 .dat / .txt / .xy 逐点交叉校验 (geshi 4-1 是同一谱的多种导出)
+    g = Path(r"D:/Project/XRD/test_xrd/geshi")
+    if (g / "4-1.raw").exists():
+        a = load_pattern(g / "4-1.raw")
+        for other in ("4-1.dat", "4-1.txt", "4-1.xy"):
+            if not (g / other).exists():
+                continue
+            b = load_pattern(g / other)
+            # 强度必须逐点全等; 2θ 允许 float32 级噪声 (2.8e-14)
+            same = (len(a) == len(b)
+                    and np.array_equal(a.intensity, b.intensity)
+                    and np.allclose(a.two_theta, b.two_theta, atol=1e-9))
+            check(same, f"RAW2 4-1.raw 与 {other} 逐点一致 (n={len(a)}, "
+                        f"dx={np.max(np.abs(a.two_theta - b.two_theta)):.1e})")
+
+
+# ---------------------------------------------------------------- Jade/MDI 文本
+def validate_jade_txt(base: Path) -> None:
+    """Jade 导出的 .txt (两行头 + 单列定宽强度) 必须按头部 start/step 建轴。"""
+    print("\n=== 3b) MDI / Jade 文本导出 (.txt) ===")
+    rp = base / "data006：AlCoO-750C.TXT"
+    if not rp.exists():
+        print("  样本不存在, 跳过"); return
+
+    d = load_pattern(rp)
+    check(len(d) == 2201 and abs(d.two_theta[0] - 15.0) < 1e-6
+          and abs(d.two_theta[-1] - 70.0) < 1e-6,
+          f"data006.TXT: 按头建轴 n={len(d)} x=[{d.two_theta[0]:.3f},{d.two_theta[-1]:.3f}]")
+    check(abs(d.wavelength - 1.5406) < 1e-6, f"data006.TXT: 靶材 Cu → λ={d.wavelength:.4f}")
+
+    # 与同名 .raw (已知真值 15→70) 交叉: 峰位/形状必须吻合
+    raw = base / "data006：AlCoO-750C.raw"
+    if raw.exists():
+        dr = load_pattern(raw, manual_axis=(15.0, (70.0 - 15.0) / 274))
+        yi = np.interp(dr.two_theta, d.two_theta, d.intensity)
+        corr = float(np.corrcoef(dr.intensity, yi)[0, 1])
+        check(corr > 0.9, f"data006.TXT 与同名 .raw 形状相关 {corr:.3f} (>0.9)")
+        px_txt = float(d.two_theta[int(np.argmax(d.intensity))])
+        px_raw = float(dr.two_theta[int(np.argmax(dr.intensity))])
+        check(abs(px_txt - px_raw) < 0.25,
+              f"data006 最强峰位一致 txt={px_txt:.3f}° raw={px_raw:.3f}°")
+
+
+# ---------------------------------------------------------------- 岛津 Shimadzu
+def validate_shimadzu(base: Path) -> None:
+    """岛津 Shimadzu 私有容器的全量解析 + 与官方 ASCII 导出逐点比对。
+
+    结构要点 (逆向自 352 个真机文件):
+      u32@0x34 = 数据字节数 (n×4) → 点数以此为准;
+      u32@0x30 + 56 = 数据起始偏移 (头长可变, 有的文件把头里嵌的源路径也算进去);
+      数据是 **int32** LE;  i32@0x12C/0x130/0x134 = 起始/终止/步长 (×1e4)。
+    """
+    print("\n=== 5) Shimadzu XRD 私有容器 ===")
+    raws = sorted(base.glob("**/*.RAW"))
+    if not raws:
+        print("  样本目录不存在, 跳过"); return
+
+    n_ok = 0
+    for rp in raws:
+        if rp.read_bytes()[:12] != b"Shimadzu XRD":
+            continue
+        parser = detect_raw_parser(rp.read_bytes())
+        try:
+            d = load_pattern(rp)
+        except Exception as e:  # noqa: BLE001
+            check(False, f"Shimadzu {rp.parent.name}/{rp.name}: 读取失败 {e}")
+            continue
+        # 头声明点数必须与取出点数一致 (0x34/4)
+        n_decl = d.metadata.get("declared_points")
+        check(n_decl == len(d) and len(d) >= 2,
+              f"Shimadzu {rp.parent.name}/{rp.name[:18]:20s} n={len(d):5d} "
+              f"kind={d.metadata.get('shimadzu_kind_name')} "
+              f"x=[{d.two_theta[0]:.3f},{d.two_theta[-1]:.3f}] "
+              f"axis_confident={d.metadata.get('axis_confident')}")
+        n_ok += 1
+    print(f"  Shimadzu .RAW 样本 {n_ok} 个")
+
+    # 与官方 ASCII 导出逐点比对 (真值)
+    def _ascii_rows(p: Path) -> np.ndarray:
+        rows = []
+        for ln in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+            s = ln.strip()
+            if not s or not s[0].isdigit():
+                continue
+            parts = s.split()
+            if len(parts) >= 2:
+                try:
+                    rows.append((float(parts[0]), float(parts[1])))
+                except ValueError:
+                    pass
+        return np.asarray(rows, dtype=float)
+
+    n_pairs = 0
+    for tp in sorted(base.glob("**/*.txt")):
+        rp = tp.with_suffix(".RAW")
+        if not rp.exists() or rp.read_bytes()[:12] != b"Shimadzu XRD":
+            continue
+        t = _ascii_rows(tp)
+        d = load_pattern(rp)
+        same_n = len(t) == len(d)
+        y_eq = same_n and np.array_equal(t[:, 1], d.intensity)
+        dx = float(np.max(np.abs(t[:, 0] - d.two_theta))) if same_n else float("nan")
+        check(same_n and y_eq and dx < 1e-6,
+              f"Shimadzu {rp.name[:22]:24s} 与官方 .txt 逐点一致 "
+              f"(n={len(d)}, y 全等={y_eq}, dx={dx:.1e})")
+        n_pairs += 1
+    print(f"  与官方 .txt 交叉校验 {n_pairs} 组")
+
+    # 边界样本回归 (都能被头里的定点字段坑到)
+    edge = {
+        # 相对路径: (期望 n, 期望 x0, 期望 x1, 期望阳极, 说明)
+        r"Stress\Theta\Theta.RAW": (101, -1.0, 1.0, "Cu", "起始角是负的 (i32, 非 u32)"),
+        r"Std\Search\Search.RAW": (1741, 23.0, 60.0, "Cu",
+                                   "步长字段被截断到 4 位小数, 需按 (end-start)/(n-1) 反推"),
+        r"Stress\Heikei-Test\Heikei-Test.RAW": (80, 34.0, 37.95, "Cu",
+                                                "头里 end=38 比末点大 1 个步长"),
+        r"Stress\std-sokkei\std-sokkei.RAW": (626, 150.0, 162.5, "Cr",
+                                              "波长字段残留 Cu, 应以靶材记号 Cr 为准"),
+        r"ENVCAL\053\053.RAW": (1210, 25.001, 43.983, "Cu",
+                                "头长可变 (含有嵌入路径, 数据起始 0x390+56)"),
+    }
+    for rel, (n, x0, x1, anode, why) in edge.items():
+        rp = base / rel
+        if not rp.exists():
+            continue
+        d = load_pattern(rp)
+        check(len(d) == n and abs(d.two_theta[0] - x0) < 5e-3
+              and abs(d.two_theta[-1] - x1) < max(5e-3, (x1 - x0) * 1e-3),
+              f"Shimadzu 边界 {rp.stem:22s} n={len(d)} x=[{d.two_theta[0]:.3f},"
+              f"{d.two_theta[-1]:.3f}]  ({why})")
+        check(str(d.metadata.get("anode", "")).upper() == anode.upper(),
+              f"Shimadzu 边界 {rp.stem:22s} 靶材={d.metadata.get('anode')!r} → "
+              f"λ={d.wavelength:.5f}")
+
+    # 峰表类 (PKR/PKK/PKS/PSE/PKF) 必须被明确拒绝, 不能产出假谱
+    pk = next((p for p in sorted(base.glob("**/*.PKR"))), None)
+    if pk is not None:
+        try:
+            load_pattern(pk)
+            check(False, f"Shimadzu {pk.name}: 峰表文件竟然被当成谱图读入")
+        except Exception as e:  # noqa: BLE001
+            check("峰表" in str(e), f"Shimadzu {pk.name}: 峰表已正确拒绝 ({str(e)[:30]}…)")
+
+    # 伴随扩展名同结构 (org/rsm/rbg/rk1/rlz/rax/rfi) 也应能读
+    sib = 0
+    for ext in ("*.ORG", "*.RSM", "*.RBG", "*.RK1", "*.RAX", "*.RLZ", "*.RFI"):
+        for p in list(base.glob(f"**/{ext}"))[:6]:
+            if p.read_bytes()[:12] != b"Shimadzu XRD":
+                continue
+            try:
+                d = load_pattern(p)
+                check(len(d) >= 2, f"Shimadzu 伴随 {p.suffix} {p.name[:20]:22s} "
+                                   f"n={len(d)}")
+                sib += 1
+            except Exception as e:  # noqa: BLE001
+                # 允许"头部空壳/无数据"的少数文件明确报错
+                check("过短" in str(e) or "超出文件长度" in str(e) or "数据段" in str(e),
+                      f"Shimadzu 伴随 {p.suffix} {p.name[:20]}: {str(e)[:40]}")
+    print(f"  伴随扩展名样本 {sib} 个可读")
+
+
+# ---------------------------------------------------------------- Bruker v1
+def validate_bruker(base: Path) -> None:
+    print("\n=== 3) Bruker/Siemens RAW v1 (RAW1.01) ===")
+    for rp in sorted(base.glob("*.raw")):
+        magic = rp.read_bytes()[:8]
+        if not magic.startswith(b"RAW1"):
+            continue
+        parser = detect_raw_parser(rp.read_bytes())
+        print(f"  {rp.name[:34]:36s} -> {parser.key}")
+        try:
+            d = load_pattern(rp)
+            print(f"      n={len(d)} ymax={d.intensity.max():.0f} "
+                  f"axis_confident={d.metadata.get('axis_confident')} "
+                  f"x=[{d.two_theta[0]:.3f},{d.two_theta[-1]:.3f}]")
+            check(d.intensity.max() > 0, f"Bruker {rp.name}: 强度数据非空")
+            check(d.metadata.get("axis_confident") is False,
+                  f"Bruker {rp.name}: 已正确标记角度轴不可信 (未硬猜)")
+        except Exception as e:
+            check(False, f"Bruker {rp.name}: {e}")
+
+
+# ---------------------------------------------------------------- 通用互通
+def validate_roundtrip(samples: list[Path]) -> None:
+    print("\n=== 4) 格式互转往返 ===")
+    import tempfile
+    from polyxrd_converter.writers import TARGET_EXTS, write_pattern
+
+    with tempfile.TemporaryDirectory() as td:
+        for sp in samples:
+            if not sp.exists():
+                continue
+            try:
+                d0 = load_pattern(sp)
+            except Exception as e:
+                check(False, f"往返 {sp.name}: 源读取失败 {e}")
+                continue
+            for key in ("xy", "txt", "dat", "csv", "json", "xrdml"):
+                out = Path(td) / f"{sp.stem}.{key}.{TARGET_EXTS[key].lstrip('.')}"
+                try:
+                    write_pattern(d0, out, key)
+                    d1 = load_pattern(out)
+                    same = (len(d0) == len(d1)
+                            and np.allclose(d0.two_theta, d1.two_theta, atol=1e-6)
+                            and np.allclose(d0.intensity, d1.intensity, atol=1e-3))
+                    check(same, f"往返 {sp.name[:18]:20s} -> {key:5s} n={len(d1)}")
+                except Exception as e:
+                    check(False, f"往返 {sp.name[:18]} -> {key}: {e}")
+            # 等间距格式另测 (MDI/RAW2 是整数/通道格式, 允许 1 个 LSB 的取整误差)
+            for key, tol in (("mdi", 1.0), ("raw", 1e-3)):
+                try:
+                    out = Path(td) / f"{sp.stem}.{key}"
+                    write_pattern(d0, out, key)
+                    d1 = load_pattern(out)
+                    same = (len(d0) == len(d1)
+                            and np.allclose(d0.two_theta, d1.two_theta, atol=5e-3)
+                            and np.allclose(d0.intensity, d1.intensity, atol=tol))
+                    check(same, f"往返 {sp.name[:18]:20s} -> {key:4s} n={len(d1)} "
+                                f"(y 最大偏差 {np.max(np.abs(d0.intensity - d1.intensity)):.3g})")
+                except Exception as e:
+                    check(False, f"往返 {sp.name[:18]} -> {key}: {e}")
+
+
+def main() -> int:
+    xr = Path(r"D:/Project/XRD")
+    print("=" * 78)
+    print("PolyXRD Converter —— RAW 解析与格式互转验证")
+    print("=" * 78)
+
+    validate_rigaku(xr / "XRData" / "csuHJW")
+    validate_manual_axis(xr / "XRData" / "csuHJW")
+    validate_raw2([xr / "XRData" / "IUCr", xr / "test_xrd" / "geshi",
+                   xr / "test_xrd" / "raw"])
+    validate_jade_txt(xr / "XRData" / "csuHJW")
+    validate_bruker(xr / "XRData" / "csuHJW")
+    validate_shimadzu(xr / "XRData" / "Shimadzu Data")
+    validate_roundtrip([
+        xr / "test_xrd" / "geshi" / "4-1.dat",
+        xr / "test_xrd" / "geshi" / "4-1.mdi",
+        xr / "XRData" / "csuHJW" / "Data007：铜衍射谱系列.raw",
+        xr / "XRData" / "IUCr" / "CPD-1A.RAW",
+    ])
+
+    print("\n" + "=" * 78)
+    print(f"通过 {len(OK)}  /  失败 {len(FAIL)}")
+    if FAIL:
+        print("\n失败明细:")
+        for m in FAIL[:40]:
+            print("  ✗", m)
+    print("=" * 78)
+    return 1 if FAIL else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
