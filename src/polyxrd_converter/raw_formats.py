@@ -47,6 +47,7 @@ class RawParseResult:
     format_key: str
     format_label: str
     axis_confident: bool = True        # 角度轴是否可信 (False → GUI 提示人工指定)
+    truncated: bool = False            # 文件被截断 (点数少于头里声明值)
     meta: dict = field(default_factory=dict)
 
 
@@ -422,30 +423,44 @@ class ShimadzuRawParser(RawParser):
         return chunk.decode("latin-1", "ignore").strip()
 
     def _data_block(self, raw: bytes):
-        """返回 (offset, n)。头里声明的偏移优先, 与文件长度互校。"""
+        """返回 (offset, n_read, n_declared, truncated)。
+
+        头里声明的偏移 (u32@0x30 + 56) 与数据字节数 (u32@0x34) 优先, 与
+        文件长度互校。声明数据区超出文件尾 = 文件被截断: **保持声明偏移
+        不动、钳到实际可用点数**并标记 truncated —— 绝不把读取窗口滑进
+        头部 (旧实现用 ``len-nbytes`` 尾推, 截断文件会把头部字节当强度
+        读进来且无任何标记)。
+        """
         nbytes = self._u32(raw, self._OFF_NBYTES)
         if nbytes is None or nbytes <= 0 or nbytes % 4 != 0:
             raise ValueError("Shimadzu RAW: 头部数据长度字段非法")
         base = self._u32(raw, self._OFF_HDR_BASE)
         if base is None:
             raise ValueError("Shimadzu RAW: 头部基址字段缺失")
-
-        candidates = []
         off_decl = base + self._HDR_TAIL
-        if off_decl + nbytes <= len(raw):
-            candidates.append((off_decl, off_decl + nbytes == len(raw)))
-        off_tail = len(raw) - nbytes
-        if off_tail >= 0 and off_tail not in (c[0] for c in candidates):
-            candidates.append((off_tail, True))
-        # 优先"偏移+长度正好抵到文件尾"的候选
-        candidates.sort(key=lambda c: (not c[1], c[0]))
-        if not candidates:
-            raise ValueError(
-                f"Shimadzu RAW: 头声明 {nbytes} 字节数据, 超出文件长度 {len(raw)}"
-            )
-        return candidates[0][0], nbytes // 4
+        n_declared = nbytes // 4
 
-    def _axis(self, raw: bytes, n: int):
+        if off_decl + nbytes > len(raw):
+            # 截断: 声明数据区装不进文件 → 钳到可用点数 (偏移仍是真实头偏移)
+            n_avail = max((len(raw) - off_decl) // 4, 0)
+            if n_avail < 2:
+                raise ValueError(
+                    f"Shimadzu RAW: 数据被截断, 可用点数不足 ({n_avail} 点, "
+                    f"声明 {n_declared} 点, 声明偏移 {off_decl}, "
+                    f"文件 {len(raw)} 字节)"
+                )
+            return off_decl, n_avail, n_declared, True
+
+        # 非截断: 声明偏移优先; 若声明区没抵到文件尾 (尾部有多余字节),
+        # 用"抵尾"候选兜底 (与既有真机样本行为一致)
+        candidates = [(off_decl, off_decl + nbytes == len(raw))]
+        off_tail = len(raw) - nbytes
+        if off_tail >= 0 and off_tail != off_decl:
+            candidates.append((off_tail, True))
+        candidates.sort(key=lambda c: (not c[1], c[0]))
+        return candidates[0][0], n_declared, n_declared, False
+
+    def _axis(self, raw: bytes, n: int, truncated: bool = False):
         """返回 (起始角, 步长, 角度轴是否可信)。"""
         start = self._i32(raw, self._OFF_START)
         end = self._i32(raw, self._OFF_END)
@@ -460,6 +475,11 @@ class ShimadzuRawParser(RawParser):
             return start, 1.0, False
 
         good_range = -180.0 <= start <= 360.0 and end <= 720.0
+        if truncated:
+            # 截断文件: 头里的 end 对应**声明点数**而非实际可读点数, 此时
+            # (end-start)/(n-1) 反推会把轴拉伸 (且该反推对任何 n 都自满足),
+            # 两种约定都无法成立 → 轴不可信, 交人工指定, 绝不硬猜。
+            return start if good_range else 0.0, step if step > 0 else 1.0, False
         if step > 0 and good_range:
             tol = max(step * 1.5, 0.01)
             if abs(start + step * (n - 1) - end) <= tol:
@@ -483,7 +503,7 @@ class ShimadzuRawParser(RawParser):
             )
         kind_name = kind_name or f"KIND{kind}"
 
-        offset, n = self._data_block(raw)
+        offset, n, n_declared, truncated = self._data_block(raw)
         if n < 2:
             raise ValueError(f"Shimadzu RAW 数据段过短 (n={n}): {path}")
 
@@ -495,7 +515,7 @@ class ShimadzuRawParser(RawParser):
                 f"Shimadzu RAW: 数据段含非法强度值 (偏移 {offset}, {n} 点): {path}"
             )
 
-        start, step, confident = self._axis(raw, n)
+        start, step, confident = self._axis(raw, n, truncated)
         two_theta = start + step * np.arange(n, dtype=float)
 
         # 靶材 → 波长: 优先用元素记号查表 (实测 Stress/std-sokkei 的波长字段残留
@@ -511,7 +531,8 @@ class ShimadzuRawParser(RawParser):
             "instrument": "Shimadzu",
             "shimadzu_kind": kind,
             "shimadzu_kind_name": kind_name,
-            "declared_points": n,
+            "declared_points": n_declared,
+            "truncated": truncated,
             "anode": anode,
             "wavelength_field": lam_field,
             "sample_label": self._text(raw, self._OFF_LABEL, 32),
@@ -532,6 +553,7 @@ class ShimadzuRawParser(RawParser):
             format_key=self.key,
             format_label=self.label,
             axis_confident=confident,
+            truncated=truncated,
             meta=meta,
         )
 
@@ -541,7 +563,6 @@ class ShimadzuRawParser(RawParser):
             return struct.unpack_from("<I", raw, off)[0]
         except struct.error:
             return None
-
 
 
 # ======================================================================

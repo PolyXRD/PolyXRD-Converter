@@ -57,6 +57,7 @@ _STATUS_KEYS = {
     "ok": "status.ok",
     "fail": "status.fail",
     "bad_axis": "status.bad_axis",
+    "truncated": "status.truncated",
     "error": "status.read_error",
 }
 
@@ -79,6 +80,7 @@ class Row:
     status: str = "ready"
     message: str = ""
     axis_confident: bool = True
+    truncated: bool = False
     manual_axis: Optional[tuple[float, float]] = None
     data: object = None          # XRDData, 惰性保留给预览
 
@@ -396,6 +398,7 @@ class MainWindow(QMainWindow):
                 row.message = r.message
                 row.data = r.data
                 row.axis_confident = r.axis_confident
+                row.truncated = r.truncated
                 if not r.ok:
                     row.status = "error"
                     row.x_range = row.peak = "—"
@@ -404,6 +407,13 @@ class MainWindow(QMainWindow):
                     row.peak = f"{r.y_max:.0f}"
                     if not r.axis_confident:
                         row.status = "bad_axis"
+                    elif r.truncated:
+                        # 文件被截断: 数据是真的但比头里声明少, 提示而非拦截
+                        row.status = "truncated"
+                        _m = row.data.metadata if row.data is not None else {}
+                        row.message = tr("tip.truncated",
+                                         declared=_m.get("declared_points", "?"),
+                                         kept=r.points)
                     else:
                         row.status = "ready"
         finally:
@@ -430,6 +440,9 @@ class MainWindow(QMainWindow):
                     if row.status == "bad_axis":
                         item.setForeground(Qt.GlobalColor.darkYellow)
                         item.setToolTip(tr("tip.axis_warn", n=row.points))
+                    elif row.status == "truncated":
+                        item.setForeground(Qt.GlobalColor.darkYellow)
+                        item.setToolTip(row.message)
                     elif row.status == "ok":
                         item.setForeground(Qt.GlobalColor.darkGreen)
                     elif row.status in ("fail", "error"):

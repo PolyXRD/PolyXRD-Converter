@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from polyxrd_converter.loader import detect_format, load_pattern  # noqa: E402
-from polyxrd_converter.raw_formats import detect_raw_parser  # noqa: E402
+from polyxrd_converter.raw_formats import detect_raw_parser, parse_raw  # noqa: E402
 
 OK, FAIL = [], []
 
@@ -297,6 +297,41 @@ def validate_shimadzu(base: Path) -> None:
         except Exception as e:  # noqa: BLE001
             check("峰表" in str(e), f"Shimadzu {pk.name}: 峰表已正确拒绝 ({str(e)[:30]}…)")
 
+    # 合成截断回归: 声明数据区超出文件尾时, 必须保持声明偏移、钳到可用
+    # 点数并标记 truncated —— 绝不能把头部字节当强度读进来 (旧版用
+    # len-nbytes 尾推, 截断文件会被静默读错且无标记)
+    import struct as _struct
+
+    _n, _hlen = 100, 968
+    _buf = bytearray(b"Shimadzu XRD\x00\x00\x00\x00Ver 0.00".ljust(0x30, b"\x00"))
+    _buf += _struct.pack("<I", _hlen - 56)          # 0x30 头部基址
+    _buf += _struct.pack("<I", _n * 4)              # 0x34 数据字节数
+    _buf += b"TruncTest Cu".ljust(_hlen - len(_buf), b"\x00")
+    _vals = [1000 + 7 * i for i in range(_n)]
+    _buf[0x20:0x24] = _struct.pack("<I", 1)         # kind = RAW
+    _buf[0x12C:0x130] = _struct.pack("<i", 200_000)  # 20.0°
+    _buf[0x130:0x134] = _struct.pack("<i", 219_500)  # 21.95°
+    _buf[0x134:0x138] = _struct.pack("<i", 200)      # 0.02°
+    _buf[624:628] = _struct.pack("<i", _n)
+    _buf += _struct.pack(f"<{_n}i", *_vals)
+    _full = bytes(_buf)
+    _trunc = _full[: len(_full) - 10 * 4]           # 截掉尾部 10 点
+
+    _d = parse_raw(_full, base / "_synth_full.RAW")
+    check(len(_d.intensity) == _n and _d.truncated is False,
+          f"Shimadzu 合成完整文件 n={len(_d.intensity)} truncated={_d.truncated}")
+    _d = parse_raw(_trunc, base / "_synth_trunc.RAW")
+    _kept = _n - 10
+    check(len(_d.intensity) == _kept and _d.truncated is True
+          and _d.meta.get("declared_points") == _n,
+          f"Shimadzu 合成截断文件 n={len(_d.intensity)}/{_n} truncated={_d.truncated} "
+          f"declared={_d.meta.get('declared_points')}")
+    check(_d.axis_confident is False,
+          f"Shimadzu 合成截断文件轴必须标记不可信 (confident={_d.axis_confident}) —— "
+          "截断时 end 对应声明点数, (end-start)/(n-1) 反推会把轴拉伸")
+    check(np.array_equal(_d.intensity, np.asarray(_vals[:_kept], dtype=float)),
+          "Shimadzu 合成截断文件保留点与原值全等 (未混入头部字节)")
+
     # 伴随扩展名同结构 (org/rsm/rbg/rk1/rlz/rax/rfi) 也应能读
     sib = 0
     for ext in ("*.ORG", "*.RSM", "*.RBG", "*.RK1", "*.RAX", "*.RLZ", "*.RFI"):
@@ -310,7 +345,8 @@ def validate_shimadzu(base: Path) -> None:
                 sib += 1
             except Exception as e:  # noqa: BLE001
                 # 允许"头部空壳/无数据"的少数文件明确报错
-                check("过短" in str(e) or "超出文件长度" in str(e) or "数据段" in str(e),
+                check("过短" in str(e) or "超出文件长度" in str(e) or "数据段" in str(e)
+                      or "数据被截断" in str(e),
                       f"Shimadzu 伴随 {p.suffix} {p.name[:20]}: {str(e)[:40]}")
     print(f"  伴随扩展名样本 {sib} 个可读")
 

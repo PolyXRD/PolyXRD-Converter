@@ -47,11 +47,17 @@ ZH: dict[str, str] = {
     "status.ok": "已转换",
     "status.fail": "失败",
     "status.bad_axis": "需手动指定角度轴",
+    "status.truncated": "文件不完整",
     "status.read_error": "无法读取",
 
     "tip.axis_warn": (
         "⚠ 该文件的角度轴不可信（文件头缺参数或参数异常）。\n"
         "已可靠取出 {n} 个强度点；请在列表里右键 →「手动指定角度轴」填入起始 2θ 与步长后再转换。"
+    ),
+    "tip.truncated": (
+        "⚠ 文件不完整：头部声明 {declared} 个点，实际只读出 {kept} 个点"
+        "（文件很可能被截断/传输不完整）。\n"
+        "已按实际可用的数据转换；如需完整谱图请重新导出/传输该文件。"
     ),
     "tip.axis_manual": "当前使用手动指定的角度轴：起始 {x0}°，步长 {step}°",
 
@@ -136,12 +142,19 @@ EN: dict[str, str] = {
     "status.ok": "Converted",
     "status.fail": "Failed",
     "status.bad_axis": "Needs manual axis",
+    "status.truncated": "Truncated file",
     "status.read_error": "Unreadable",
 
     "tip.axis_warn": (
         "⚠ The 2θ axis of this file is not trustworthy (header missing/invalid).\n"
         "{n} intensity points were read reliably; right-click the row → "
         "“Specify 2θ axis manually” before converting."
+    ),
+    "tip.truncated": (
+        "⚠ Incomplete file: header declares {declared} points, but only {kept} points "
+        "could be read (the file is likely truncated / incompletely transferred).\n"
+        "Converted with the actually available data; re-export/re-transfer the file "
+        "if you need the full pattern."
     ),
     "tip.axis_manual": "Using manual axis: start {x0}°, step {step}°",
 

@@ -92,7 +92,8 @@ def _selftest(argv: list[str]) -> int:
             lines.append(f"[FAIL] {f.name}: {r.message}")
             continue
         lines.append(f"[ OK ] {f.name}: {r.format_label} n={r.points} "
-                     f"x=[{r.x_min:.3f},{r.x_max:.3f}] axis_confident={r.axis_confident}")
+                     f"x=[{r.x_min:.3f},{r.x_max:.3f}] axis_confident={r.axis_confident} "
+                     f"truncated={r.truncated}")
         if r.axis_confident:
             try:
                 out = convert_file(f, tmp / (f.stem + ".xrdml"))

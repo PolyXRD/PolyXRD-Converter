@@ -33,6 +33,7 @@ class ProbeResult:
     y_max: float = 0.0
     wavelength: Optional[float] = None
     axis_confident: bool = True
+    truncated: bool = False
     message: str = ""
     data: Optional[XRDData] = field(default=None, repr=False)
 
@@ -69,6 +70,7 @@ def probe(path: Union[str, Path], manual_axis: Optional[tuple[float, float]] = N
         y_max=float(np.max(data.intensity)) if len(data) else 0.0,
         wavelength=data.wavelength,
         axis_confident=bool(data.metadata.get("axis_confident", True)),
+        truncated=bool(data.metadata.get("truncated", False)),
         data=data,
     )
 
