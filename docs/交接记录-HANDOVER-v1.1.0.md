@@ -115,10 +115,11 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 | v1.0.0 | 2026-10-09 | `5ffe15e` | 初版：多厂商 RAW 魔数识别 + 全部读写格式 + GUI 批量/预览/手动轴 + 双语 | 243 断言 + 冒烟 40 |
 | v1.1.0 | 2026-10-10 | `86d27cd` | **岛津 .RAW 解析精度升级**：截断文件防护（钳点数+`truncated` 全链路透出）、截断轴强制转人工、「end 差一步长」约定精确化 | 247 断言 + 冒烟 40 + 主项目对拍 206 文件强度全等 + smz geshi 13 对逐点全等 |
 | v1.2.0 | 2026-10-10 | `4b33f48` | **P1 + P2**：修复 `writers._fmt_pair` 两列粘连（高强度/大整数样本不再塌缩成单列）；新增 θ 单轴摇摆扫描 GUI 提示 | 252 断言 + 冒烟 40 + 冻结 exe 真样本自检 10/10 全过 |
+| v1.3.0 | 2026-10-10 | `bf6707a` | **GSAS-II 系格式移植**：新增 gsas / fp_dat / ras(.rasx) / xye / chi 五类文本读取器（格式知识参考 GSAS-II 开源 importer，按其许可注明来源） | 311 断言 + 冒烟 40 + 冻结 exe 自检 10/10；另与 GSAS-II 本体 oracle 对拍 |
 
-**发布状态**：v1.2.0 已推送 GitHub 并发布 Release（exe 55.99 MB + SHA256，哈希回下载闭环一致）。工作树干净（仅 `.workbuddy/` 未跟踪），无未推送提交，无遗留任务。
+**发布状态**：v1.3.0 已推送 GitHub 并发布 Release（exe + SHA256，哈希回下载闭环一致）。工作树干净（仅 `.workbuddy/` 未跟踪），无未推送提交，无遗留任务。
 
-**v1.2.0 之后（未发版）**：新增 GSAS-II 系 5 类文本格式读取器（gsas/fp_dat/ras/xye/chi，格式知识参考 GSAS-II 开源 importer 并按其许可注明来源；详见 loader.py 节注）。验证扩至 **311 断言** + 冒烟 40 全绿；另用 GSAS-II 本体（`C:/gsas2main/python.exe` + `sys.path` 指其 `GSAS-II` 目录）做 oracle 逐点对拍：14 个合成样本中 10 个与 GSAS-II 完全一致（dx=dy=0），4 个 SKIP 均为 GSAS-II 自身缺陷（见 §6.4）。
+**GSAS-II oracle 对拍**（v1.3.0 一次性验证，结论沉淀在此）：用 `C:/gsas2main/python.exe` + `sys.path` 指其 `GSAS-II` 目录可调 GSAS-II 的 importer 当参考实现；14 个合成样本中 **10 个与 GSAS-II 逐点全等（dx=dy=0）**，4 个 SKIP 均为 GSAS-II 自身缺陷（见 §6.4）。
 
 **验证能力现状**：XRData 全库 305 个岛津容器文件解析成功（26 个真实截断全部正确标记拦截、1 个零点截断明确报错）；岛津解析与主项目 `DataLoader._load_shimadzu_raw` 强度 100% 全等。
 
