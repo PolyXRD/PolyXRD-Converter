@@ -6,7 +6,7 @@
 
 ## 功能
 
-- **读入**：`xy` `txt` `dat` `csv` `smz` `mdi` `xrdml/xml` `brml` `json`，以及多厂商二进制 `RAW`（自动识别，见下表）；岛津项目的 `.ORG/.RSM/.RBG/.RK1/.RAX/.RLZ/.RFI` 与 `.RAW` 同结构，一并支持
+- **读入**：`xy` `txt` `dat` `csv` `smz` `mdi` `xrdml/xml` `brml` `json`，GSAS 粉末数据（`gsas`/`fxye`/`gda`，FXYE/FXY/ESD/STD 四种 BANK 类型）、FullProf `.dat`、理学 `.ras`/`.rasx`、Topas `.xye`/`.qye`、Fit2D `.chi`/`.qchi`，以及多厂商二进制 `RAW`（自动识别，见下表）；岛津项目的 `.ORG/.RSM/.RBG/.RK1/.RAX/.RLZ/.RFI` 与 `.RAW` 同结构，一并支持
 - **写出**：`xy` `txt` `dat` `csv` `mdi` `raw` `xrdml` `json`
 - **批量转换**：拖入整个目录，后台线程逐个转换，实时进度
 - **谱图预览**：手绘曲线（不依赖 matplotlib），滚轮缩放 / 拖拽平移 / 双击复位 / 最强峰标记
@@ -67,7 +67,7 @@ convert_file("spectrum.raw", "spectrum.xrdml")   # 单文件转换
 真实样本全量交叉校验（与同谱其它格式导出逐点比对）：
 
 ```
-python tests/validate_samples.py     # 247 项断言
+python tests/validate_samples.py     # 311 项断言
 python tests/smoke_gui.py            # GUI 离屏冒烟 40 项
 ```
 
@@ -78,6 +78,7 @@ python tests/smoke_gui.py            # GUI 离屏冒烟 40 项
 - **Scintag**：RAW2 33 个（与 `.dat/.txt/.xy` 逐点全等）
 - **Bruker**：RAW v1 轴损坏样本正确拦截
 - **Jade**：文本导出按头建轴 + 峰位交叉
+- **GSAS-II 系文本格式**：`.gsas/.fxye`（FXYE/FXY/ESD/STD）、FullProf `.dat`、Rigaku `.ras/.rasx`、Topas `.xye/.qye`、Fit2D `.chi/.qchi` 合成样本全格式回归，并以 GSAS-II 本体（Argonne 开源参考实现）做 oracle 逐点对拍 —— 10 种格式与 GSAS-II 完全一致，4 项跳过均为 GSAS-II 自身缺陷（STD `int()` 崩溃、Fit2D 头误入 pyFAI 分支等），本实现均规避
 - 8 种格式往返守恒
 
 ## 开发

@@ -18,7 +18,7 @@
 
 | 方向 | 格式 |
 |---|---|
-| 读（文本） | `xy` `txt` `dat` `csv` `smz` `mdi`(Jade) `xrdml/xml` `brml` `json` |
+| 读（文本） | `xy` `txt` `dat` `csv` `smz` `mdi`(Jade) `xrdml/xml` `brml` `json`；GSAS 粉末数据 `gsas/fxye/gda/gsa/gss`（FXYE/FXY/ESD/STD 四种 BANK 类型，TOF/EDS 明确拒绝）；FullProf `dat`（start/step/stop 头自洽判定）；理学 `ras`/`rasx`（zip 内存直读）；Topas `xye/qye`；Fit2D `chi/qchi`（Q 轴按 λ 换算 2θ） |
 | 读（二进制 RAW，魔数自动分流） | 岛津 `Shimadzu XRD` 容器（`.RAW/.ORG/.RSM/.RBG/.RK1/.RAX/.RLZ/.RFI` 同结构）；理学 Rigaku `FI\x00\x00`；Scintag `RAW2`；Bruker/Siemens `RAW1.01/RAW1.00/RAW `；未知魔数兜底 |
 | 写 | `xy` `txt` `dat` `csv` `mdi` `raw` `xrdml` `json` |
 
@@ -118,6 +118,8 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 
 **发布状态**：v1.2.0 已推送 GitHub 并发布 Release（exe 55.99 MB + SHA256，哈希回下载闭环一致）。工作树干净（仅 `.workbuddy/` 未跟踪），无未推送提交，无遗留任务。
 
+**v1.2.0 之后（未发版）**：新增 GSAS-II 系 5 类文本格式读取器（gsas/fp_dat/ras/xye/chi，格式知识参考 GSAS-II 开源 importer 并按其许可注明来源；详见 loader.py 节注）。验证扩至 **311 断言** + 冒烟 40 全绿；另用 GSAS-II 本体（`C:/gsas2main/python.exe` + `sys.path` 指其 `GSAS-II` 目录）做 oracle 逐点对拍：14 个合成样本中 10 个与 GSAS-II 完全一致（dx=dy=0），4 个 SKIP 均为 GSAS-II 自身缺陷（见 §6.4）。
+
 **验证能力现状**：XRData 全库 305 个岛津容器文件解析成功（26 个真实截断全部正确标记拦截、1 个零点截断明确报错）；岛津解析与主项目 `DataLoader._load_shimadzu_raw` 强度 100% 全等。
 
 ---
@@ -148,6 +150,13 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 14. 图标重新生成（`build_icon.py`）字节幂等，不产生 git diff。
 15. 主项目移植经验（同样适用本项目）：批量输出同主名冲突会**永久振荡**（两源互相覆盖互判陈旧）；"已存在就跳过"的幂等会永久保留坏数据，应升级为"陈旧自检"（比对点数/轴/强度不一致才重写）。
 
+### 6.4 GSAS-II 系格式移植（v1.2.0 之后，§6 只增不删）
+
+16. **GSAS-II 本体可当对拍 oracle**：`C:/gsas2main/python.exe` + `sys.path` 指向 `C:/gsas2main/GSAS-II` 即可脱离 GUI 调 `GSASII.imports.*ReaderClass` 的 ContentsValidator/Reader；合成样本"双实现逐点对拍"是最强验收（比纯合成断言强一档）。
+17. **GSAS-II 参考实现的四个坑**（我们均规避）：① STD 分支 `Nch=int(cons[2])` 对 "BANK 1 STD …" 直接 `int('STD')` 崩溃；② Fit2D 头 `Array: chi_2theta` 会被其误判为 pyFAI minimalHeader，导致 Reader 把首行标题当数据解析失败；③ rasx 的 `Profile0.txt` **硬编码 `seek(3)` 跳 BOM**（真文件带 UTF-8 BOM；我们用 `utf-8-sig` 有 BOM 剥、无 BOM 不坏）；④ `.qchi` 波长提取 `S.split()[1:]` 对 `# q λ` 三段式注释取到 '#' 而越界。我们的 chi 数据行提取为"全文件恰好两列数值行"，头行数不硬编码（硬编码 `lines[4:]` 会丢 pyFAI 两行头文件的前两个数据点——oracle 对拍踩过）。
+18. **`/* */` 单行注释的 got_c 置位缺陷**：GSAS-II 的 FP reader/validator 遇单行 `/* … */` 会把块注释态永久置位、吞掉后续所有行；本实现检测 `*/` 是否同行再决定是否进入块注释态。
+19. **`.dat` 四义判定顺序**（detect_format）：Jade 两行头 → GSAS BANK → FullProf 头（需全量数据做 `start+step*(n-1)≈stop` 自洽校验，4KB 头嗅探不够）→ 普通两列文本。自写两列 `.dat` 的往返守恒是回归基线（FP 误判守卫）。
+
 ---
 
 ## 7. 已知问题与下一步计划
@@ -156,7 +165,7 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 |---|---|---|
 | ~~**P1**~~ ✅ 已解决 (2026-10-10) | `writers._fmt_pair` 两列粘连修复 | 照搬主项目 `b0fdec7` 思路：仅当 y 字段首字符非空格（占满 10 字符场宽，如 `126727.648` 或 10 位整数）时补一个显式分隔空格；正常样本保持与原厂字节一致。新增 P1 回归 5 项（`tests/validate_samples.py::validate_fmt_pair`）；`validate` 252/252、冒烟 40/40 全绿 |
 | ~~P2~~ ✅ 已解决 (2026-10-10) | θ 单轴扫描的用户提示 | 二进制无法自动判别；已在 `i18n.tip.rocking_scan`（中/英）新增文案，并透出到手动定轴对话框、坏轴状态 tooltip、坏轴预览说明三处轴提示 |
-| P3 | 新厂商格式 | 按用户给样本再逆向（Bruker RAW v2/v3、理学 RAS 等均未支持）；流程见 §3/§4 |
+| ~~P3~~ ◐ 部分完成 (2026-10-10) | 新厂商格式 | **GSAS-II 系文本格式已入**（gsas/fp_dat/ras/xye/chi，含 GSAS-II oracle 对拍）；Bruker RAW v2/v3、理学 RAS 二进制等仍按用户样本再逆向；流程见 §3/§4 |
 | P4 | 发版流程脚本化 | 把 §4.3 流水线 + Release 脚本（幂等：tag 已存在跳过、资产 sha256 比对）固化为 tools/release.py |
 
 ---
