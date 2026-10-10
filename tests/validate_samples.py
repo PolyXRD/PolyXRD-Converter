@@ -372,6 +372,47 @@ def validate_bruker(base: Path) -> None:
             check(False, f"Bruker {rp.name}: {e}")
 
 
+# ---------------------------------------------------------------- 写出格式 P1
+def validate_fmt_pair() -> None:
+    """P1 回归: writers._fmt_pair 两列粘连修复。
+
+    正常 y 值 (首字符为空格) 必须保持与原厂字节一致 (不加分隔符);
+    溢出 10 字符场宽 (首字符非空格, 如 126727.648 或 10 位整数) 时,
+    必须补一个显式分隔空格, 否则下游 np.loadtxt 会把整行读成单列而报
+    "columns changed"。本测试不依赖真机样本, 始终可跑。
+    """
+    print("\n=== 0) writers._fmt_pair 两列粘连 (P1 回归) ===")
+    from polyxrd_converter.model import XRDData
+    from polyxrd_converter.writers import write_pattern, _fmt_pair
+    import tempfile
+
+    # 1) 字节一致性: 正常行不得多出分隔符 (保住与原厂字节一致的往返)
+    normal = _fmt_pair(10.0, 500.0)
+    check(normal == "  10.000       500",
+          f"P1: 正常行字节一致 (got {normal!r})")
+    # 2) 小数 / 大整数溢出行必须补分隔符 (首字符非空格)
+    dec_over = _fmt_pair(20.0, 126727.648)
+    check(dec_over == "  20.000 126727.648",
+          f"P1: 小数溢出行已补分隔符 (got {dec_over!r})")
+    big_int = _fmt_pair(30.0, 1234567890.0)
+    check(big_int == "  30.000 1234567890",
+          f"P1: 大整数行已补分隔符 (got {big_int!r})")
+
+    # 3) 端到端: 写出 .txt 后 np.loadtxt 应为 2 列且数值正确
+    x = np.array([10.0, 20.0, 30.0], dtype=float)
+    y = np.array([500.0, 126727.648, 1234567890.0], dtype=float)
+    d = XRDData(two_theta=x, intensity=y, wavelength=1.5406)
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "p1_sample.txt"
+        write_pattern(d, p, "txt")
+        arr = np.loadtxt(str(p))
+        check(arr.shape == (3, 2),
+              f"P1: 端到端 np.loadtxt 读回为 2 列 (shape={arr.shape})")
+        check(np.allclose(arr[:, 0], x)
+              and np.allclose(arr[:, 1], y, atol=1e-3),
+              "P1: 端到端回读数值正确")
+
+
 # ---------------------------------------------------------------- 通用互通
 def validate_roundtrip(samples: list[Path]) -> None:
     print("\n=== 4) 格式互转往返 ===")
@@ -419,6 +460,7 @@ def main() -> int:
     print("PolyXRD Converter —— RAW 解析与格式互转验证")
     print("=" * 78)
 
+    validate_fmt_pair()
     validate_rigaku(xr / "XRData" / "csuHJW")
     validate_manual_axis(xr / "XRData" / "csuHJW")
     validate_raw2([xr / "XRData" / "IUCr", xr / "test_xrd" / "geshi",

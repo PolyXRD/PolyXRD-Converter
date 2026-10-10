@@ -65,10 +65,20 @@ def _fmt_pair(x: float, y: float) -> str:
     """两列文本的一行。
 
     整数强度按整数列写 (与原厂 .dat/.txt/.xy 导出同构); 含小数时保留 3 位。
+
+    两列之间靠「左填充空格」天然分隔: x 固定 8 宽、y 固定 10 宽, 正常 y 值
+    首字符是空格, 列边界清晰。但当 y 值大到占满 10 字符场宽 (首字符不再是
+    空格, 如 126727.648 或 10 位整数) 时, 列边界会塌缩成单列, 下游
+    np.loadtxt 报 "columns changed"。此时补一个显式分隔空格即可 —— 只在
+    溢出时才补, 正常样本保持与原厂字节一致 (不破坏往返字节对拍)。
     """
+    x_field = f"{x:8.3f}"
     if abs(y - round(y)) < 1e-9:
-        return f"{x:8.3f}{int(round(y)):10d}"
-    return f"{x:8.3f}{y:10.3f}"
+        y_field = f"{int(round(y)):10d}"
+    else:
+        y_field = f"{y:10.3f}"
+    sep = "" if y_field[0] == " " else " "
+    return x_field + sep + y_field
 
 
 def _write_two_column(data: XRDData, path: Path) -> None:
