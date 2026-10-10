@@ -36,6 +36,11 @@ FORMAT_LABELS: dict[str, str] = {
     "smz": "文本 (.smz)",
     "mdi": "MDI / Jade (.mdi)",
     "jade_txt": "MDI / Jade 文本导出 (.txt)",
+    "gsas": "GSAS 粉末数据 (.gsas/.fxye/.gda)",
+    "fp_dat": "FullProf .dat",
+    "ras": "理学 Rigaku .ras/.rasx",
+    "xye": "Topas .xye/.qye",
+    "chi": "Fit2D .chi/.qchi",
     "xrdml": "Bruker XRDML (.xrdml/.xml)",
     "brml": "Bruker BRML (.brml)",
     "json": "PolyXRD 谱图 JSON (.json)",
@@ -156,6 +161,31 @@ def detect_format(path: Union[str, Path]) -> tuple[str, str]:
     # 必须在"按扩展名当两列文本"之前判掉, 否则单列定宽强度会被读成两列 → 假轴。
     if _jade_head(head.decode("utf-8", "ignore").splitlines()) is not None:
         return "jade_txt", FORMAT_LABELS["jade_txt"]
+
+    # --- GSAS-II 系文本格式 (gsas / fp_dat / ras / xye / chi) ---
+    if ext == ".rasx":
+        return "ras", FORMAT_LABELS["ras"]
+    if ext == ".ras" and head.decode("latin-1", "ignore").lstrip().startswith(
+            "*RAS_DATA_START"):
+        return "ras", FORMAT_LABELS["ras"]
+    head_lines_l1 = head.decode("latin-1", "ignore").splitlines()
+    if ext in (".fxye", ".gsas", ".gda", ".gsa", ".gss") and _gsas_banks(head_lines_l1):
+        return "gsas", FORMAT_LABELS["gsas"]
+    if ext in (".xye", ".qye"):
+        return "xye", FORMAT_LABELS["xye"]
+    if ext in (".chi", ".qchi"):
+        return "chi", FORMAT_LABELS["chi"]
+    if ext == ".dat":
+        # .dat 四义: Jade 头 (上面已判) / GSAS BANK / FullProf 头 / 普通两列文本。
+        if _gsas_banks(head_lines_l1):
+            return "gsas", FORMAT_LABELS["gsas"]
+        # FullProf 判定需要全量数据做 stop 自洽校验 (头嗅探 4KB 不够), .dat 都是小文本
+        try:
+            full_lines = p.read_text(encoding="utf-8-sig", errors="ignore").splitlines()
+        except OSError:
+            full_lines = []
+        if _fp_head(full_lines) is not None:
+            return "fp_dat", FORMAT_LABELS["fp_dat"]
 
     if ext in (".xy", ".txt", ".dat", ".csv", ".smz"):
         key = ext.lstrip(".")
@@ -329,6 +359,486 @@ def _load_mdi(path: Path, key: str = "mdi") -> XRDData:
         intensity=intensity,
         wavelength=wl or 1.5406,
         metadata={"format": key, "num_points": n},
+    )
+
+
+# ----------------------------------------------------------------------
+# GSAS-II 系文本格式 (gsas / fp_dat / ras / xye / chi)
+# ----------------------------------------------------------------------
+# 格式知识参考 GSAS-II (UChicago Argonne, LLC 开源许可) 的对应 importer:
+#   imports/G2pwd_fxye.py / G2pwd_FP.py / G2pwd_rigaku.py / G2pwd_xye.py。
+# 按 GSAS-II 开源许可要求在此注明来源与修改: 本实现为按本项目架构与
+# "数据保真"红线的重写裁剪 —— 与 GSAS-II 的有意差异:
+#   1. 不把 ≤0 的强度清零 (保留存储原值, 背底扣除后的负强度是合法数据);
+#   2. Q 模式 (qye/qchi) 不做 GSAS-II 的强度 ×100 (Fit2D 标度约定), 照原值转出;
+#   3. TOF (TIME_MAP) 与能量色散 (EDS) 明确报错拒绝 —— 横轴不是 2θ, 绝不硬猜。
+# ----------------------------------------------------------------------
+
+
+def _sfloat_blank(s: str) -> float:
+    """定宽字段转 float, 全空格按 0 (GSAS 定宽格式的格式定义, 非猜测)。"""
+    s = s.strip()
+    return float(s) if s else 0.0
+
+
+def _gsas_banks(lines: list[str]) -> list[tuple[str, int]]:
+    """扫描 GSAS 文件的 BANK 记录, 返回 [(BANK 行, 数据起始行号)]。
+
+    与 GSAS-II 一致: 首行恒为标题注释; 第二行可选 ``INST ...``; ``#`` 为注释。
+    """
+    banks: list[tuple[str, int]] = []
+    for i, ln in enumerate(lines):
+        if i == 0 or ln.startswith("#"):
+            continue
+        if i == 1 and ln[:4].lower() == "inst":
+            continue
+        if ln[:4] == "BANK":
+            banks.append((ln, i + 1))
+    return banks
+
+
+def _fp_head(lines: list[str]) -> Optional[dict]:
+    """FullProf .dat 头判定 (宁可漏判不误判)。
+
+    命中条件: 首个非注释行是 ``start step stop`` 三个数字 (范围合理), 且其后
+    等列数的数值行总数 n 满足 ``start + step*(n-1) ≈ stop`` (差 ≤ 1 步长)。
+    最后一条自洽校验是防误判的关键 —— 普通三列文本的第二列是强度,
+    不可能当步长通过 1e-4~5° 的范围检查后再对上 stop。
+    """
+    got_c = False
+    header_seen = False
+    start = step = stop = 0.0
+    data_lines: list[list[float]] = []
+    for ln in lines:
+        s = ln.strip()
+        if not s:
+            continue
+        if not header_seen:
+            if got_c:
+                if "*/" in s:
+                    got_c = False
+                continue
+            if s.startswith("/*"):
+                # 单行 /* ... */ 不进入块注释态 (比 GSAS-II 参考实现更稳)
+                if "*/" not in s[2:]:
+                    got_c = True
+                continue
+            if s[0] in "'#!":
+                continue
+            if "lambda" in s.lower():
+                continue                       # 波长行在头之前, 跳过
+            toks = s.replace(",", " ").split()
+            if len(toks) < 3:
+                return None
+            try:
+                start, step, stop = float(toks[0]), float(toks[1]), float(toks[2])
+            except ValueError:
+                return None
+            if not (0.0 <= start < 180.0 and 1e-4 <= step <= 5.0
+                    and start < stop <= 180.0):
+                return None
+            header_seen = True
+            continue
+        toks = s.replace(",", " ").split()
+        vals: list[float] = []
+        for t in toks:
+            try:
+                vals.append(float(t))
+            except ValueError:
+                break                       # 数据区里的注释/杂行, 跳过
+        if vals:
+            data_lines.append(vals)
+    if not header_seen or not data_lines:
+        return None
+    ncols = len(data_lines[0])
+    if not (1 <= ncols <= 10) or any(len(v) != ncols for v in data_lines):
+        return None
+    n = len(data_lines) * ncols
+    if abs(start + step * (n - 1) - stop) > step:
+        return None
+    return {"start": start, "step": step, "stop": stop}
+
+
+def _q_to_two_theta(q: np.ndarray, wavelength: float) -> np.ndarray:
+    """Q (Å⁻¹) → 2θ (度): 2θ = 2·asin(λQ/4π)。换算式与 GSAS-II 一致。"""
+    arg = wavelength * np.asarray(q, dtype=float) / (4.0 * np.pi)
+    if float(arg.max()) > 1.0:
+        raise DataFormatError(
+            f"Q 值超出波长 λ={wavelength}Å 的可换算范围 (λQ/4π 最大 {arg.max():.3f} > 1);"
+            " 波长注释可能不对, 请核对后重试。"
+        )
+    return 2.0 * np.degrees(np.arcsin(arg))
+
+
+def _load_gsas(path: Path) -> XRDData:
+    """GSAS 粉末数据 (.gsas/.fxye/.gda/.gsa/.gss, BANK 记录四种数据类型)。
+
+    - FXYE: 每行 ``x(百分度) y esd`` 三列, x/100 → 度 (显式 x 列, 最可靠);
+    - FXY:  每行 ``x(百分度) y`` 两列;
+    - ESD:  定宽 80 列, 每 16 字符一组 = 8 字符 y + 8 字符 esd, x 由 BANK 的
+      start/step (百分度) 计算重建;
+    - STD:  定宽 80 列, 每 10 字符一组 = 2 字符归一计数 + 6 字符原始计数
+      + 2 空格, x 同样由 BANK 重建 (强度存原始计数字段, 与 GSAS-II 相同)。
+    多 BANK 取第一块 (本工具单谱定位); TOF/EDS 明确拒绝。
+    """
+    # latin-1 逐字节解码: ESD/STD 是定宽格式, 字节偏移即字符偏移
+    text = path.read_bytes().decode("latin-1", errors="ignore")
+    if "TIME_MAP" in text:
+        raise DataFormatError(
+            f"{path.name} 是中子飞行时间 (TOF) GSAS 数据 (含 TIME_MAP), "
+            "横轴是飞行时间不是 2θ; 本工具不支持。"
+        )
+    lines = text.splitlines()
+    banks = _gsas_banks(lines)
+    if not banks:
+        raise DataFormatError(f"GSAS 文件没有 BANK 记录: {path}")
+    bank_line, di = banks[0]
+    if "EDS" in bank_line or "ALT" in bank_line:
+        raise DataFormatError(
+            f"{path.name} 是能量色散 (EDS) 或飞行时间类 (ALT) GSAS 数据, "
+            "横轴不是 2θ; 本工具不支持。"
+        )
+    cons = bank_line.split()
+    start = step = None
+    if len(cons) >= 7:
+        try:
+            start = float(cons[5]) / 100.0
+            step = float(cons[6]) / 100.0
+        except ValueError:
+            start = step = None
+
+    xs: list[float] = []
+    ys: list[float] = []
+    j = 0
+    if "FXYE" in bank_line or "FXY" in bank_line:
+        for ln in lines[di:]:
+            if ln[:4] == "BANK" or ln.startswith("#"):
+                break
+            parts = ln.split()
+            if len(parts) < 2:
+                continue
+            xs.append(float(parts[0]) / 100.0)   # 百分度 → 度
+            ys.append(float(parts[1]))
+    elif "ESD" in bank_line:
+        if start is None:
+            raise DataFormatError(f"ESD bank 缺 start/step 字段: {bank_line.rstrip()!r}")
+        for ln in lines[di:]:
+            if ln[:4] == "BANK" or ln.startswith("#"):
+                break
+            ln = ln.replace("\x1a", "").ljust(80)
+            for i in range(0, 80, 16):
+                if ln[i:i + 8].strip() == "":
+                    break
+                xs.append(start + step * j)
+                ys.append(_sfloat_blank(ln[i:i + 8]))
+                j += 1
+    else:  # STD (缺省类型, 与 GSAS-II 的兜底一致)
+        if start is None:
+            raise DataFormatError(f"STD bank 缺 start/step 字段: {bank_line.rstrip()!r}")
+        for ln in lines[di:]:
+            if ln[:4] == "BANK" or ln.startswith("#"):
+                break
+            ln = ln.replace("\x1a", "").ljust(80)
+            for i in range(0, 80, 8):
+                if ln[i:i + 10].strip() == "":
+                    break
+                xs.append(start + step * j)
+                ys.append(_sfloat_blank(ln[i + 2:i + 8]))
+                j += 1
+
+    if len(xs) < 2:
+        raise DataFormatError(f"GSAS 文件有效数据点不足: {path}")
+    bank_type = next((t for t in ("FXYE", "FXY", "ESD", "STD", "ALT") if t in bank_line),
+                     "STD")
+    return XRDData(
+        two_theta=np.asarray(xs, dtype=float),
+        intensity=np.asarray(ys, dtype=float),
+        wavelength=1.5406,
+        metadata={
+            "format": "gsas",
+            "bank_type": bank_type,
+            "bank_line": bank_line.strip(),
+            "num_banks": len(banks),
+            "num_points": len(xs),
+        },
+    )
+
+
+def _load_fp_dat(path: Path) -> XRDData:
+    """FullProf .dat (1-10 列): 注释后首行 ``start step stop``, 之后每行 1-10 个
+    强度值, x = start + N*step 递增到 stop; ``lambda λ`` 行给波长。
+    参考: GSAS-II imports/G2pwd_FP.py。"""
+    text = path.read_text(encoding="utf-8-sig", errors="ignore")
+    lines = text.splitlines()
+    got_c = False
+    start = step = stop_at = None
+    wl: Optional[float] = None
+    xs: list[float] = []
+    ys: list[float] = []
+    stopped = False
+    for ln in lines:
+        s = ln.strip()
+        if not s:
+            continue
+        if start is None:
+            if got_c:
+                if "*/" in s:
+                    got_c = False
+                continue
+            if s.startswith("/*"):
+                if "*/" not in s[2:]:
+                    got_c = True
+                continue
+            if s[0] in "'#!":
+                continue
+            toks = s.replace(",", " ").split()
+            if "lambda" in s.lower() and len(toks) >= 2:
+                try:
+                    wl = float(toks[1])
+                except ValueError:
+                    pass
+                continue
+            if len(toks) < 3:
+                continue                       # 头前杂行 (GSAS-II 容忍)
+            try:
+                start, step, stop_at = float(toks[0]), float(toks[1]), float(toks[2])
+            except ValueError:
+                continue
+            continue
+        if stopped:
+            break
+        toks = s.replace(",", " ").split()
+        row: list[float] = []
+        for t in toks:
+            try:
+                row.append(float(t))
+            except ValueError:
+                break                          # 数据区混入注释行, 跳过该行
+        for f in row:
+            x = start + step * len(xs)
+            xs.append(x)
+            ys.append(f)
+            if x >= stop_at:                   # 到 stop 即止 (FullProf 约定)
+                stopped = True
+                break
+    if start is None or len(xs) < 2:
+        raise DataFormatError(f"FullProf .dat 没有有效数据 (缺 start/step/stop 头?): {path}")
+    return XRDData(
+        two_theta=np.asarray(xs, dtype=float),
+        intensity=np.asarray(ys, dtype=float),
+        wavelength=wl or 1.5406,
+        metadata={
+            "format": "fp_dat",
+            "start": start, "step": step, "stop": stop_at,
+            "num_points": len(xs),
+        },
+    )
+
+
+def _load_ras(path: Path) -> XRDData:
+    """理学 Rigaku .ras (文本) / .rasx (zip 容器)。
+
+    参考: GSAS-II imports/G2pwd_rigaku.py。.ras 以 ``*RAS_DATA_START`` 开头,
+    数据在 ``*RAS_INT_START`` ... ``*RAS_INT_END`` 之间, 每行 ``2θ 强度``;
+    多扫描块取第一块。.rasx 是 zip, 直接从内存读 Data*/Profile*.txt 成员
+    (不像 GSAS-II 那样解压落盘), 并从测量条件 XML 里尽力找波长。
+    """
+    import zipfile
+
+    wl: Optional[float] = None
+    container = "ras"
+    if path.suffix.lower() == ".rasx":
+        container = "rasx"
+        try:
+            with zipfile.ZipFile(str(path)) as zf:
+                names = zf.namelist()
+                prof = next(
+                    (n for n in names
+                     if n.lower().endswith(".txt") and "profile" in n.lower()), None)
+                if prof is None:
+                    raise DataFormatError(f"rasx 里找不到 Profile*.txt 成员: {path}")
+                text = zf.read(prof).decode("utf-8-sig", "ignore")
+                xml_name = next((n for n in names if n.lower().endswith(".xml")), None)
+                if xml_name:
+                    xml_text = zf.read(xml_name).decode("utf-8-sig", "ignore")
+                    m = re.search(r"(?i)wavelength\D{0,40}?(\d+\.\d+)", xml_text)
+                    if m:
+                        wl = float(m.group(1))
+        except zipfile.BadZipFile as exc:
+            raise DataFormatError(f"rasx 不是合法 ZIP: {path} ({exc})") from exc
+    else:
+        text = path.read_bytes().decode("latin-1", errors="ignore")
+        if not text.lstrip().startswith("*RAS_DATA_START"):
+            raise DataFormatError(f"不是 Rigaku .ras 文件 (缺 *RAS_DATA_START): {path}")
+        m = re.search(r"(?i)wavelength\D{0,40}?(\d+\.\d+)", text)
+        if m:
+            wl = float(m.group(1))
+        in_block = False
+        kept: list[str] = []
+        for ln in text.splitlines():
+            s = ln.strip()
+            if s == "*RAS_INT_START":
+                in_block = True
+                continue
+            if s == "*RAS_INT_END":
+                break                          # 只取第一个扫描块
+            if in_block:
+                kept.append(ln)
+        text = "\n".join(kept)
+
+    xs: list[float] = []
+    ys: list[float] = []
+    for ln in text.splitlines():
+        parts = ln.split()
+        if len(parts) < 2:
+            continue
+        try:
+            xs.append(float(parts[0]))
+            ys.append(float(parts[1]))
+        except ValueError:
+            continue
+    if len(xs) < 2:
+        raise DataFormatError(f"Rigaku .ras/.rasx 没有有效数据行: {path}")
+    return XRDData(
+        two_theta=np.asarray(xs, dtype=float),
+        intensity=np.asarray(ys, dtype=float),
+        wavelength=wl or 1.5406,
+        metadata={"format": "ras", "container": container, "num_points": len(xs)},
+    )
+
+
+def _load_xye(path: Path) -> XRDData:
+    """Topas .xye/.qye: ``#``/``!``/``'`` 注释、``/* */`` 块、``TITLE`` 行、
+    首行 ``xydata`` (FullProf 头) 均跳过; 数据 2-3 列 (x y [esd], esd 忽略)。
+    .qye 的 x 是 Q (Å⁻¹), 必须有 ``#wavelength λ`` 注释行才能换算 2θ。
+    参考: GSAS-II imports/G2pwd_xye.py (换算式一致; 强度不 ×100, 见节注)。"""
+    is_q = path.suffix.lower() == ".qye"
+    text = path.read_text(encoding="utf-8-sig", errors="ignore")
+    lines = text.splitlines()
+    wl: Optional[float] = None
+    if is_q:
+        for ln in lines[:60]:
+            if "wavelength" not in ln.lower():
+                continue
+            toks = ln.replace(",", " ").split()
+            for k, t in enumerate(toks):
+                if "wavelength" in t.lower() and k + 1 < len(toks):
+                    try:
+                        wl = float(toks[k + 1])
+                    except ValueError:
+                        pass
+                    break
+            if wl:
+                break
+        if wl is None:
+            raise DataFormatError(
+                f"{path.name} 是 Q 轴 .qye 文件, 但注释里没有 '#wavelength <λ>' 行, "
+                "无法换算成 2θ; 请在文件头补一行 '#wavelength <波长Å>'。"
+            )
+
+    got_c = False
+    xs: list[float] = []
+    ys: list[float] = []
+    for i, ln in enumerate(lines):
+        s = ln.strip()
+        if not s:
+            continue
+        if got_c:
+            if "*/" in s:
+                got_c = False
+            continue
+        if s.startswith("/*"):
+            if "*/" not in s[2:]:
+                got_c = True
+            continue
+        if s[0] in "'#!":
+            continue
+        if i == 0 and "xydata" in s.lower():
+            continue
+        if s.upper().startswith("TITLE"):
+            continue
+        parts = s.replace(",", " ").replace(";", " ").split()
+        if len(parts) < 2:
+            continue
+        try:
+            xs.append(float(parts[0]))
+            ys.append(float(parts[1]))
+        except ValueError:
+            continue
+    if len(xs) < 2:
+        raise DataFormatError(f"xye/qye 文件没有有效数据行: {path}")
+    two_theta = np.asarray(xs, dtype=float)
+    intensity = np.asarray(ys, dtype=float)
+    if is_q:
+        two_theta = _q_to_two_theta(two_theta, wl)
+    return XRDData(
+        two_theta=two_theta,
+        intensity=intensity,
+        wavelength=wl or 1.5406,
+        metadata={"format": "xye", "q_mode": is_q, "num_points": len(xs)},
+    )
+
+
+def _load_chi(path: Path) -> XRDData:
+    """Fit2D .chi/.qchi: 头 4 行里 ``2-theta``/``chi_2theta`` 记 2θ 模式,
+    ``q`` 行 (如 ``q_A^-1 1.5406``) 记 Q 模式并给波长; 数据为两列。
+    pyFAI 简化头 (前几行 '#' 注释) 兼容。参考: GSAS-II imports/G2pwd_xye.py。"""
+    is_q_ext = path.suffix.lower() == ".qchi"
+    text = path.read_text(encoding="utf-8-sig", errors="ignore")
+    lines = text.splitlines()
+    mode = None
+    wl: Optional[float] = None
+    for ln in lines[:6]:
+        low = ln.lower()
+        if "2-theta" in low or "chi_2theta" in low:
+            mode = "2th"
+            break
+        if low.startswith("q") or " q " in low:
+            for t in ln.split()[1:]:
+                try:
+                    wl = float(t)
+                    break
+                except ValueError:
+                    continue
+            if wl:
+                mode = "q"
+                break
+    if mode is None:
+        raise DataFormatError(
+            f"不是 Fit2D .chi 文件 (头 4 行里没有 2-theta/q 标识): {path}"
+        )
+    if mode == "q" and wl is None:
+        raise DataFormatError(
+            f"{path.name} 是 Q 轴 .qchi 文件, 但头里没给波长 (应为 'q <λ>' 形式), "
+            "无法换算成 2θ。"
+        )
+    xs: list[float] = []
+    ys: list[float] = []
+    # 数据行 = 全文件里"恰好两列数值"的行: Fit2D 标准头 4 行与 pyFAI 简化头
+    #'#' 注释都天然不满足两列数值, 因此头行数不必硬编码 (pyFAI 头只有 2 行,
+    # 硬编码 lines[4:] 会丢前两个数据点 —— oracle 对拍时踩过)。
+    for ln in lines:
+        s = ln.strip()
+        if not s or s.startswith("#"):
+            continue
+        parts = s.split()
+        if len(parts) != 2:
+            continue
+        try:
+            xs.append(float(parts[0]))
+            ys.append(float(parts[1]))
+        except ValueError:
+            continue
+    if len(xs) < 2:
+        raise DataFormatError(f"chi 文件没有有效数据行: {path}")
+    two_theta = np.asarray(xs, dtype=float)
+    if mode == "q":
+        two_theta = _q_to_two_theta(two_theta, wl)
+    return XRDData(
+        two_theta=two_theta,
+        intensity=np.asarray(ys, dtype=float),
+        wavelength=wl or 1.5406,
+        metadata={"format": "chi", "mode": mode, "num_points": len(xs)},
     )
 
 
@@ -562,6 +1072,16 @@ def load_pattern(
 
         if key in ("mdi", "jade_txt"):
             data = _load_mdi(p, key)
+        elif key == "gsas":
+            data = _load_gsas(p)
+        elif key == "fp_dat":
+            data = _load_fp_dat(p)
+        elif key == "ras":
+            data = _load_ras(p)
+        elif key == "xye":
+            data = _load_xye(p)
+        elif key == "chi":
+            data = _load_chi(p)
         elif key == "xrdml":
             data = _load_xrdml(p)
         elif key == "brml":

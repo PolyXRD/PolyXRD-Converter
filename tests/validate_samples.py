@@ -413,6 +413,200 @@ def validate_fmt_pair() -> None:
               "P1: 端到端回读数值正确")
 
 
+# ---------------------------------------------------------------- GSAS-II 系文本
+def make_gsas2_samples(td: Path) -> dict:
+    """生成 GSAS-II 系新格式 (gsas/fp_dat/ras/xye/chi) 的合成样本。
+
+    返回 ``{文件名: dict(x=真值2θ, y=真值强度, key=期望识别, q=是否Q模式, note=说明)}``。
+    公共真值: 2θ 从 20.000° 步长 0.02° 共 100 点; 强度 100+7i 全为正
+    (避开 GSAS-II 把 ≤0 清零的语义差异, 便于与 GSAS-II oracle 逐点对拍)。
+    """
+    n = 100
+    x = 20.0 + 0.02 * np.arange(n)
+    y = 100.0 + 7.0 * np.arange(n)
+    wl = 1.5406
+    q = 4.0 * np.pi * np.sin(np.radians(x) / 2.0) / wl
+    out: dict = {}
+
+    def put(name: str, text: str, info: dict) -> None:
+        (td / name).write_text(text, encoding="ascii", newline="")
+        out[name] = info
+
+    # 1) GSAS FXYE: x 为百分度显式列 + y + esd
+    lines = ["Synthetic GSAS FXYE (PolyXRD Converter test)",
+             "BANK 1 FXYE 100 101 2000 2 3980"]
+    for i in range(n):
+        lines.append(f"{round(x[i] * 100):d} {y[i]:.1f} {10.0 + 0.05 * i:.2f}")
+    put("synth_fxye.gsas", "\n".join(lines) + "\n",
+        dict(x=x, y=y, key="gsas", note="FXYE 显式 x 百分度列"))
+
+    # 2) GSAS FXY: x 百分度 + y 两列
+    lines = ["Synthetic GSAS FXY", "BANK 1 FXY 100 101 2000 2 3980"]
+    for i in range(n):
+        lines.append(f"{round(x[i] * 100):d} {y[i]:.1f}")
+    put("synth_fxy.gsas", "\n".join(lines) + "\n",
+        dict(x=x, y=y, key="gsas", note="FXY 两列"))
+
+    # 3) GSAS ESD: 定宽 16 字符组 (8y+8esd), x 由 BANK start/step (百分度) 重建
+    lines = ["Synthetic GSAS ESD", "BANK 1 ESD 100 101 2000 2 3980"]
+    for base in range(0, n, 5):
+        row = ""
+        for k in range(5):
+            i = base + k
+            if i >= n:
+                break
+            row += f"{y[i]:8.1f}{10.0 + 0.05 * i:8.2f}"
+        lines.append(row)
+    put("synth_esd.gsas", "\n".join(lines) + "\n",
+        dict(x=x, y=y, key="gsas", note="ESD 定宽重建轴"))
+
+    # 4) GSAS STD: 定宽 8 字符组 (2 归一计数 + 6 原始计数), 每行 10 组, 强度存整数
+    lines = ["Synthetic GSAS STD", "BANK 1 STD 100 101 2000 2 3980"]
+    for base in range(0, n, 10):
+        row = ""
+        for k in range(10):
+            i = base + k
+            if i >= n:
+                break
+            row += f"01{int(round(y[i])):6d}"
+        lines.append(row)
+    put("synth_std.gsas", "\n".join(lines) + "\n",
+        dict(x=x, y=np.round(y), key="gsas", note="STD 定宽 (整数计数)"))
+
+    # 5) FullProf .dat 单列
+    lines = ["/* Synthetic FullProf (PolyXRD Converter test) */",
+             "lambda 1.5406", "20.00 0.02 21.98"]
+    for v in y:
+        lines.append(f"{v:.1f}")
+    put("synth_fp1.dat", "\n".join(lines) + "\n",
+        dict(x=x, y=y, key="fp_dat", note="FP 单列 + lambda 行"))
+
+    # 6) FullProf .dat 5 列
+    lines = ["# Synthetic FullProf 5col", "20.00 0.02 21.98"]
+    for base in range(0, n, 5):
+        lines.append(" ".join(f"{y[base + k]:.1f}" for k in range(5) if base + k < n))
+    put("synth_fp5.dat", "\n".join(lines) + "\n",
+        dict(x=x, y=y, key="fp_dat", note="FP 5 列"))
+
+    # 7) Rigaku .ras: 头带波长, 数据块 + 应被忽略的第二块
+    lines = ["*RAS_DATA_START", "*RAS_HEADER_START", "*XRAY_WAVELENGTH 1.5406",
+             "*RAS_HEADER_END", "*RAS_INT_START"]
+    for i in range(n):
+        lines.append(f"{x[i]:.3f}  {y[i]:.1f}")
+    lines += ["*RAS_INT_END", "*RAS_INT_START", "19.000  1.0", "*RAS_INT_END"]
+    put("synth.ras", "\n".join(lines) + "\n",
+        dict(x=x, y=y, key="ras", note="第一扫描块 (第二块被忽略)"))
+
+    # 8) Rigaku .rasx: zip 容器 (Profile + 测量条件 XML)
+    import zipfile as _zf
+    prof = "\n".join(f"{x[i]:.3f}  {y[i]:.1f}" for i in range(n)) + "\n"
+    xml = ('<?xml version="1.0"?><Setup><XRay>'
+           "<Wavelength>1.5406</Wavelength></XRay></Setup>")
+    with _zf.ZipFile(td / "synth.rasx", "w") as z:
+        # 真 rasx 的 Profile0.txt 带 UTF-8 BOM (GSAS-II 参考实现甚至硬编码 seek(3) 跳它)
+        z.writestr("Data0/Profile0.txt", b"\xef\xbb\xbf" + prof.encode("utf-8"))
+        z.writestr("Data0/MesurementConditions0.xml", xml)
+    out["synth.rasx"] = dict(x=x, y=y, key="ras", note="rasx zip 内存直读")
+
+    # 9) Topas .xye (3 列, esd 忽略)
+    lines = ["# Synthetic Topas xye"]
+    for i in range(n):
+        lines.append(f"{x[i]:.3f}  {y[i]:.1f}  {10.0 + 0.05 * i:.2f}")
+    put("synth.xye", "\n".join(lines) + "\n",
+        dict(x=x, y=y, key="xye", note="Topas xye 3 列"))
+
+    # 10) Topas .qye (Q 轴 + #wavelength 注释; 三段式写法兼容 GSAS-II oracle)
+    lines = ["# wavelength 1.5406", "# Synthetic Topas qye"]
+    for i in range(n):
+        lines.append(f"{q[i]:.6f}  {y[i]:.1f}")
+    put("synth.qye", "\n".join(lines) + "\n",
+        dict(x=x, y=y, key="xye", q=True, note="qye Q→2θ 换算"))
+
+    # 11) Fit2D .chi (2θ)
+    lines = ["Fit2d exchange format v1.0", "", "Array: chi_2theta", "2-theta  I"]
+    for i in range(n):
+        lines.append(f"{x[i]:.3f}  {y[i]:.1f}")
+    put("synth.chi", "\n".join(lines) + "\n",
+        dict(x=x, y=y, key="chi", note="Fit2D chi 2θ"))
+
+    # 12) Fit2D .qchi (Q + 头行波长; 'q λ' 写法兼容 GSAS-II oracle)
+    lines = ["Fit2d exchange format v1.0", "", "Array: q", "q 1.5406"]
+    for i in range(n):
+        lines.append(f"{q[i]:.6f}  {y[i]:.1f}")
+    put("synth.qchi", "\n".join(lines) + "\n",
+        dict(x=x, y=y, key="chi", q=True, note="qchi Q→2θ 换算"))
+
+    # 13) pyFAI 简化头 .chi / .qchi (头只有 2 行注释; 供 GSAS-II oracle 对拍)
+    lines = ["# chi_2theta", "# position (deg)  intensity"]
+    for i in range(n):
+        lines.append(f"{x[i]:.4f}  {y[i]:.1f}")
+    put("synth_pyfai.chi", "\n".join(lines) + "\n",
+        dict(x=x, y=y, key="chi", note="pyFAI 简化头 chi"))
+    lines = ["# q 1.5406", "# synthetic qchi pyFAI-style"]
+    for i in range(n):
+        lines.append(f"{q[i]:.6f}  {y[i]:.1f}")
+    put("synth_pyfai.qchi", "\n".join(lines) + "\n",
+        dict(x=x, y=y, key="chi", q=True, note="pyFAI 简化头 qchi"))
+
+    # 14) TOF 拒绝样本 (不进 samples 断言, 单独测)
+    (td / "synth_tof.gsas").write_text(
+        "Synthetic TOF\nBANK 1 FXYE 10 101 0 1 10\nTIME_MAP 1 10 1 1\n",
+        encoding="ascii", newline="")
+    return out
+
+
+def validate_gsas2_formats() -> None:
+    """GSAS-II 系新格式回归: 合成样本全格式读取 + 边界 (TOF 拒绝 / FP 误判守卫)。
+
+    真机样本不在位时的降级方案; 另用 GSAS-II 本体 (C:/gsas2main) 作为
+    oracle 逐点对拍 (一次性验证, 结论沉淀在本函数注释与交接记录)。
+    """
+    print("\n=== 6) GSAS-II 系文本格式 (gsas/fp_dat/ras/xye/chi) ===")
+    from polyxrd_converter.loader import DataFormatError, detect_format
+    from polyxrd_converter.model import XRDData
+    from polyxrd_converter.writers import write_pattern
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as td_s:
+        td = Path(td_s)
+        samples = make_gsas2_samples(td)
+        for name, info in samples.items():
+            p = td / name
+            key, _ = detect_format(p)
+            check(key == info["key"], f"{name[:22]:24s} 识别为 {key} (期望 {info['key']})")
+            try:
+                d = load_pattern(p)
+            except DataFormatError as e:
+                check(False, f"{name[:22]:24s} 读取失败: {e}")
+                continue
+            atol_x = 1e-3 if info.get("q") else 1e-9
+            check(len(d) == len(info["x"]),
+                  f"{name[:22]:24s} 点数 {len(d)} == {len(info['x'])} ({info['note']})")
+            check(np.allclose(d.two_theta, info["x"], atol=atol_x),
+                  f"{name[:22]:24s} 2θ 轴逐点一致 "
+                  f"(max|dx|={np.max(np.abs(d.two_theta - info['x'])):.2e})")
+            check(np.allclose(d.intensity, info["y"], atol=1e-9),
+                  f"{name[:22]:24s} 强度逐点一致")
+
+        # TOF 必须明确拒绝 (横轴不是 2θ, 绝不硬猜)
+        try:
+            load_pattern(td / "synth_tof.gsas")
+            check(False, "TOF GSAS (TIME_MAP) 竟被当成 2θ 谱读入")
+        except DataFormatError:
+            check(True, "TOF GSAS (TIME_MAP) 已明确拒绝")
+
+        # 自写两列 .dat 不得被 FullProf 判定误吞 (往返守恒是 P1 修复的回归基线)
+        p_dat = td / "guard.dat"
+        write_pattern(XRDData(two_theta=info["x"], intensity=info["y"],
+                              wavelength=1.5406), p_dat, "dat")
+        key, _ = detect_format(p_dat)
+        check(key == "dat", f"自写两列 .dat 仍识别为普通文本 (got {key})")
+        d2 = load_pattern(p_dat)
+        check(np.allclose(d2.two_theta, info["x"], atol=1e-6)
+              and np.allclose(d2.intensity, info["y"], atol=1e-3),
+              "自写两列 .dat 往返数值一致 (FP 误判守卫)")
+
+
 # ---------------------------------------------------------------- 通用互通
 def validate_roundtrip(samples: list[Path]) -> None:
     print("\n=== 4) 格式互转往返 ===")
@@ -461,6 +655,7 @@ def main() -> int:
     print("=" * 78)
 
     validate_fmt_pair()
+    validate_gsas2_formats()
     validate_rigaku(xr / "XRData" / "csuHJW")
     validate_manual_axis(xr / "XRData" / "csuHJW")
     validate_raw2([xr / "XRData" / "IUCr", xr / "test_xrd" / "geshi",
