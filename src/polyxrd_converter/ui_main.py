@@ -63,6 +63,9 @@ _STATUS_KEYS = {
 
 _SCAN_EXTS = {".raw", ".xy", ".txt", ".dat", ".csv", ".mdi", ".xrdml", ".xml",
               ".brml", ".json", ".smz", ".asc",
+              # GSAS-II 系文本格式 (谱图):
+              ".gsas", ".fxye", ".gda", ".gsa", ".gss",
+              ".ras", ".rasx", ".xye", ".qye", ".chi", ".qchi",
               # 岛津 Shimadzu 私有容器的伴随扩展名 (与 .RAW 同结构, 均为扫描谱):
               # .org 原始 / .rsm 平滑 / .rbg 背底 / .rk1 Kα1 剥离 / .rlz / .rax / .rfi
               ".org", ".rsm", ".rbg", ".rk1", ".rlz", ".rax", ".rfi"}

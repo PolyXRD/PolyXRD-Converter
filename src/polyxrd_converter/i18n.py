@@ -41,7 +41,7 @@ ZH: dict[str, str] = {
     "lbl.overwrite": "覆盖同名文件",
     "lbl.preview": "谱图预览",
     "lbl.log": "转换日志",
-    "lbl.empty_hint": "把 .raw / .xy / .txt / .dat / .csv / .mdi / .xrdml / .brml 文件拖到这里，或点「添加文件」",
+    "lbl.empty_hint": "把 .raw / .xy / .txt / .dat / .csv / .mdi / .xrdml / .brml / .gsas / .ras 等谱图文件拖到这里，或点「添加文件」",
 
     "status.ready": "待转换",
     "status.ok": "已转换",
@@ -86,6 +86,8 @@ ZH: dict[str, str] = {
         "<b>PolyXRD Converter</b> v{version}<br><br>"
         "XRD 谱图格式互转工具，从 PolyXRD 中独立剥离。<br>"
         "读取：xy / txt / dat / csv / mdi / xrdml / brml / json，"
+        "GSAS (.gsas/.fxye/.gda)、FullProf .dat、Rigaku .ras/.rasx、"
+        "Topas .xye/.qye、Fit2D .chi/.qchi，"
         "以及多种厂商二进制 RAW（自动识别魔数）：<br>"
         "· 岛津 Shimadzu XRD（.RAW/.ORG/.RSM/.RBG/.RK1/.RAX/.RLZ/.RFI）<br>"
         "· 理学 Rigaku RINT（FI）<br>· Scintag RAW2<br>· Bruker/Siemens RAW v1（RAW1.01）<br>"
@@ -102,7 +104,7 @@ ZH: dict[str, str] = {
     "log.failed": "✗ {src}: {err}",
     "log.progress": "正在转换 {i}/{n}：{name}",
 
-    "filter.open": "XRD 谱图 (*.raw *.RAW *.org *.rsm *.rbg *.rk1 *.rax *.rlz *.rfi *.xy *.txt *.TXT *.dat *.csv *.mdi *.xrdml *.xml *.brml *.json);;所有文件 (*)",
+    "filter.open": "XRD 谱图 (*.raw *.RAW *.org *.rsm *.rbg *.rk1 *.rax *.rlz *.rfi *.xy *.txt *.TXT *.dat *.csv *.mdi *.xrdml *.xml *.brml *.json *.gsas *.fxye *.gda *.gsa *.gss *.ras *.rasx *.xye *.qye *.chi *.qchi);;所有文件 (*)",
     "filter.dirtitle": "选择包含谱图文件的文件夹",
 }
 
@@ -140,7 +142,7 @@ EN: dict[str, str] = {
     "lbl.overwrite": "Overwrite existing",
     "lbl.preview": "Pattern preview",
     "lbl.log": "Log",
-    "lbl.empty_hint": "Drag .raw / .xy / .txt / .dat / .csv / .mdi / .xrdml / .brml files here, or click “Add files”.",
+    "lbl.empty_hint": "Drag .raw / .xy / .txt / .dat / .csv / .mdi / .xrdml / .brml / .gsas / .ras files here, or click “Add files”.",
 
     "status.ready": "Pending",
     "status.ok": "Converted",
@@ -188,7 +190,8 @@ EN: dict[str, str] = {
     "dlg.about": (
         "<b>PolyXRD Converter</b> v{version}<br><br>"
         "XRD pattern format converter, extracted from PolyXRD.<br>"
-        "Reads: xy / txt / dat / csv / mdi / xrdml / brml / json, plus several "
+        "Reads: xy / txt / dat / csv / mdi / xrdml / brml / json, GSAS (.gsas/.fxye/.gda), "
+        "FullProf .dat, Rigaku .ras/.rasx, Topas .xye/.qye, Fit2D .chi/.qchi, plus several "
         "vendor binary RAW formats (magic-based auto-detection):<br>"
         "· Shimadzu XRD (.RAW/.ORG/.RSM/.RBG/.RK1/.RAX/.RLZ/.RFI)<br>"
         "· Rigaku RINT (FI)<br>· Scintag RAW2<br>"
@@ -206,7 +209,7 @@ EN: dict[str, str] = {
     "log.failed": "✗ {src}: {err}",
     "log.progress": "Converting {i}/{n}: {name}",
 
-    "filter.open": "XRD patterns (*.raw *.RAW *.org *.rsm *.rbg *.rk1 *.rax *.rlz *.rfi *.xy *.txt *.TXT *.dat *.csv *.mdi *.xrdml *.xml *.brml *.json);;All files (*)",
+    "filter.open": "XRD patterns (*.raw *.RAW *.org *.rsm *.rbg *.rk1 *.rax *.rlz *.rfi *.xy *.txt *.TXT *.dat *.csv *.mdi *.xrdml *.xml *.brml *.json *.gsas *.fxye *.gda *.gsa *.gss *.ras *.rasx *.xye *.qye *.chi *.qchi);;All files (*)",
     "filter.dirtitle": "Choose a folder containing pattern files",
 }
 
