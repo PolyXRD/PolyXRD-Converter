@@ -2,7 +2,7 @@
 
 **XRD 谱图格式转换器** —— 从 [PolyXRD](https://github.com/PolyXRD/PolyXRD) 独立剥离的轻量小工具：把各种厂商/软件导出的谱图文件互转成你需要的目标格式，**多厂商 RAW 二进制自动识别**，双击即用，无需安装。
 
-<img src="src/polyxrd_converter/resources/icon.png" alt="PolyXRD Converter" width="96">
+<div align="center"><img src="src/polyxrd_converter/resources/icon.png" alt="PolyXRD Converter" width="96"></div>
 
 ## 功能
 
