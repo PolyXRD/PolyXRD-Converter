@@ -13,9 +13,11 @@ PolyXRD Converter —— XRD 谱图格式转换器
 v1.1.0: 岛津 .RAW 解析精度升级 —— 截断文件防护 (钳到可用点数 + truncated
 标记 + 截断时角度轴强制转人工), 与 PolyXRD 主体 ``DataLoader._load_shimadzu_raw``
 全量对拍验证 (强度逐点全等)。
+v1.2.0: 修复 writers._fmt_pair 两列粘连 (P1, 高强度/大整数样本不再塌缩成单列);
+新增 θ 单轴摇摆扫描 GUI 提示 (P2); 验证扩到 252 断言 + 冒烟 40。
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __author__ = "PolyXRD Team"
 __app_name__ = "PolyXRD Converter"
 
