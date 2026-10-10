@@ -99,7 +99,8 @@ class AxisDialog(QDialog):
         self._n = row.points
 
         root = QVBoxLayout(self)
-        hint = QLabel(tr("dlg.axis.hint", name=row.path.name, n=row.points))
+        hint = QLabel(tr("dlg.axis.hint", name=row.path.name, n=row.points)
+                      + "\n\n" + tr("tip.rocking_scan"))
         hint.setWordWrap(True)
         root.addWidget(hint)
 
@@ -439,7 +440,8 @@ class MainWindow(QMainWindow):
                 if c == 5:
                     if row.status == "bad_axis":
                         item.setForeground(Qt.GlobalColor.darkYellow)
-                        item.setToolTip(tr("tip.axis_warn", n=row.points))
+                        item.setToolTip(tr("tip.axis_warn", n=row.points)
+                                       + "\n\n" + tr("tip.rocking_scan"))
                     elif row.status == "truncated":
                         item.setForeground(Qt.GlobalColor.darkYellow)
                         item.setToolTip(row.message)
@@ -495,9 +497,10 @@ class MainWindow(QMainWindow):
                                title=row.path.name, subtitle=sub, note=note)
         if not row.axis_confident:
             self._preview_info.setText(
-                tr("tip.axis_warn", n=len(data)) if not row.manual_axis
-                else tr("tip.axis_manual", x0=f"{row.manual_axis[0]:g}",
-                        step=f"{row.manual_axis[1]:g}")
+                (tr("tip.axis_warn", n=len(data)) if not row.manual_axis
+                 else tr("tip.axis_manual", x0=f"{row.manual_axis[0]:g}",
+                         step=f"{row.manual_axis[1]:g}"))
+                + "\n\n" + tr("tip.rocking_scan")
             )
         else:
             self._preview_info.setText("")

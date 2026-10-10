@@ -60,6 +60,10 @@ ZH: dict[str, str] = {
         "已按实际可用的数据转换；如需完整谱图请重新导出/传输该文件。"
     ),
     "tip.axis_manual": "当前使用手动指定的角度轴：起始 {x0}°，步长 {step}°",
+    "tip.rocking_scan": (
+        "若此文件是 θ 单轴摇摆 / 极图扫描（记录轴为 θ 而非 2θ），请在上方填 θ "
+        "起始与步长；转换器按原轴照转，不会自动折算成 2θ，转换前请核对。"
+    ),
 
     "dlg.axis.title": "手动指定角度轴",
     "dlg.axis.hint": (
@@ -157,6 +161,12 @@ EN: dict[str, str] = {
         "if you need the full pattern."
     ),
     "tip.axis_manual": "Using manual axis: start {x0}°, step {step}°",
+    "tip.rocking_scan": (
+        "If this file is a θ single-axis rocking / pole-figure scan (recorded axis is "
+        "θ, not 2θ), enter the θ start and step above if possible; the converter "
+        "preserves the original axis and will not auto-convert it to 2θ — please "
+        "verify before converting."
+    ),
 
     "dlg.axis.title": "Specify 2θ axis manually",
     "dlg.axis.hint": (
