@@ -15,7 +15,14 @@ from typing import Optional
 
 import numpy as np
 from PySide6.QtCore import QObject, Qt, QThread, QUrl, Signal
-from PySide6.QtGui import QAction, QDesktopServices, QDragEnterEvent, QDropEvent, QIcon
+from PySide6.QtGui import (
+    QAction,
+    QActionGroup,
+    QDesktopServices,
+    QDragEnterEvent,
+    QDropEvent,
+    QIcon,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -46,7 +53,7 @@ from PySide6.QtWidgets import (
 
 from polyxrd_converter import __version__
 from polyxrd_converter.converter import probe
-from polyxrd_converter.i18n import language, set_language, tr
+from polyxrd_converter.i18n import LANGS, fmt_label, lang_name, language, set_language, tr
 from polyxrd_converter.loader import detect_format
 from polyxrd_converter.raw_formats import detect_raw_parser
 from polyxrd_converter.ui_preview import SpectrumView
@@ -78,6 +85,7 @@ class Row:
     path: Path
     points: int = 0
     format_label: str = ""
+    fmt_key: str = ""        # i18n 用的格式 key (RAW 时是 raw_variant), 切语言时重查
     x_range: str = ""
     peak: str = ""
     status: str = "ready"
@@ -250,9 +258,9 @@ class MainWindow(QMainWindow):
         rl = QVBoxLayout(right)
         rl.setContentsMargins(0, 0, 0, 0)
         rl.setSpacing(4)
-        cap = QLabel(tr("lbl.preview"))
-        cap.setStyleSheet("color:#1f2d3d;font-weight:600;")
-        rl.addWidget(cap)
+        self._cap_preview = QLabel(tr("lbl.preview"))
+        self._cap_preview.setStyleSheet("color:#1f2d3d;font-weight:600;")
+        rl.addWidget(self._cap_preview)
         self._preview = SpectrumView()
         rl.addWidget(self._preview, 1)
         self._preview_info = QLabel("")
@@ -267,13 +275,14 @@ class MainWindow(QMainWindow):
         box = QGroupBox()
         bl = QVBoxLayout(box)
         line1 = QHBoxLayout()
-        line1.addWidget(QLabel(tr("lbl.target")))
+        self._lbl_target = QLabel(tr("lbl.target"))
+        line1.addWidget(self._lbl_target)
         self._fmt = QComboBox()
-        for key, ext, label in TARGET_FORMATS:
-            self._fmt.addItem(f"{label}", key)
+        self._fill_targets()
         line1.addWidget(self._fmt, 2)
         line1.addSpacing(12)
-        line1.addWidget(QLabel(tr("lbl.outdir")))
+        self._lbl_outdir = QLabel(tr("lbl.outdir"))
+        line1.addWidget(self._lbl_outdir)
         self._outdir = QLineEdit()
         self._outdir.setPlaceholderText(tr("lbl.outdir_same"))
         line1.addWidget(self._outdir, 4)
@@ -321,6 +330,27 @@ class MainWindow(QMainWindow):
 
         self._log.appendPlainText(tr("lbl.empty_hint"))
 
+    def _fill_targets(self) -> None:
+        """目标格式下拉: 文案取自 i18n, 切语言时重填并保住当前选中项。"""
+        cur = self._fmt.currentData()
+        self._fmt.blockSignals(True)
+        self._fmt.clear()
+        for key, _ext, label in TARGET_FORMATS:
+            self._fmt.addItem(tr(label), key)
+        if cur:
+            i = self._fmt.findData(cur)
+            if i >= 0:
+                self._fmt.setCurrentIndex(i)
+        self._fmt.blockSignals(False)
+
+    def _update_filecount(self) -> None:
+        n = len(self._rows)
+        self._filecount.setText("" if not n else tr("lbl.filecount", n=n))
+
+    def _row_label(self, row: Row) -> str:
+        """行的格式展示名: 按当前语言重查 (RAW 变体走 raw_variant)。"""
+        return fmt_label(row.fmt_key, fallback=row.format_label) or "…"
+
     def _build_menu(self) -> None:
         bar = self.menuBar()
         mf = bar.addMenu(tr("menu.file"))
@@ -335,13 +365,17 @@ class MainWindow(QMainWindow):
         mf.addAction(a3)
 
         ml = bar.addMenu(tr("menu.lang"))
-        self._act_zh = QAction("中文", self, checkable=True)
-        self._act_en = QAction("English", self, checkable=True)
-        self._act_zh.setChecked(language() == "zh")
-        self._act_en.setChecked(language() == "en")
-        self._act_zh.triggered.connect(lambda: self._switch_lang("zh"))
-        self._act_en.triggered.connect(lambda: self._switch_lang("en"))
-        ml.addActions([self._act_zh, self._act_en])
+        # 由 i18n.LANGS 生成, 新增语言只需改 i18n 一处; 名称用母语写法, 不翻译。
+        grp = QActionGroup(self)
+        grp.setExclusive(True)
+        self._lang_actions: dict[str, QAction] = {}
+        for code in LANGS:
+            act = QAction(lang_name(code), self, checkable=True)
+            act.setChecked(code == language())
+            act.triggered.connect(lambda _c=False, c=code: self._switch_lang(c))
+            ml.addAction(act)
+            grp.addAction(act)
+            self._lang_actions[code] = act
 
         mh = bar.addMenu(tr("menu.help"))
         ab = QAction(tr("menu.help.about"), self)
@@ -349,15 +383,39 @@ class MainWindow(QMainWindow):
         mh.addAction(ab)
 
     def _switch_lang(self, lang: str) -> None:
+        """切换界面语言: 菜单/控件/清单/预览全部即时重译, 无需重启。"""
         set_language(lang)
-        self._act_zh.setChecked(lang == "zh")
-        self._act_en.setChecked(lang == "en")
-        # 文案已写进控件, 最省事的做法是重建窗口内容
-        QMessageBox.information(
-            self, tr("dlg.info"),
-            "语言已切换，重启程序后完全生效。" if lang == "zh"
-            else "Language switched; restart for full effect.",
-        )
+        self._retranslate_ui()
+        self._log.appendPlainText(tr("tip.lang_switched", lang=lang_name(lang)))
+
+    def _retranslate_ui(self) -> None:
+        # 1) 菜单栏重建 (文案写在 QAction 里, 重建最省心)
+        self.menuBar().clear()
+        self._build_menu()
+        # 2) 静态控件文案
+        self.setWindowTitle(tr("app.title"))
+        self._btn_add.setText(tr("btn.add_files"))
+        self._btn_dir.setText(tr("btn.add_dir"))
+        self._btn_rm.setText(tr("btn.remove"))
+        self._btn_clear.setText(tr("btn.clear"))
+        self._btn_convert.setText(tr("btn.convert"))
+        self._btn_open.setText(tr("btn.open_out"))
+        self._btn_outdir.setText(tr("btn.browse"))
+        self._lbl_target.setText(tr("lbl.target"))
+        self._lbl_outdir.setText(tr("lbl.outdir"))
+        self._outdir.setPlaceholderText(tr("lbl.outdir_same"))
+        self._overwrite.setText(tr("lbl.overwrite"))
+        self._cap_preview.setText(tr("lbl.preview"))
+        self._table.setHorizontalHeaderLabels([
+            tr("col.file"), tr("col.format"), tr("col.points"),
+            tr("col.range"), tr("col.peak"), tr("col.status"),
+        ])
+        self._fill_targets()
+        self._update_filecount()
+        # 3) 依赖语言的行内容 (状态列 + 预览副标题/提示)
+        self._refresh_table()
+        self._update_preview()
+        self._preview.update()
 
     # ---- 文件清单 ----------------------------------------------------
 
@@ -384,9 +442,7 @@ class MainWindow(QMainWindow):
         if added:
             self._probe_rows()
         self._refresh_table()
-        self._filecount.setText(f"{len(self._rows)} file(s)" if not self._rows else
-                                f"{len(self._rows)} 个文件" if language() == "zh"
-                                else f"{len(self._rows)} files")
+        self._update_filecount()
 
     def _probe_rows(self) -> None:
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
@@ -401,6 +457,10 @@ class MainWindow(QMainWindow):
                 )
                 row.message = r.message
                 row.data = r.data
+                row.fmt_key = str(
+                    (row.data.metadata if row.data is not None else {}).get("raw_variant")
+                    or r.format_key or ""
+                )
                 row.axis_confident = r.axis_confident
                 row.truncated = r.truncated
                 if not r.ok:
@@ -430,7 +490,7 @@ class MainWindow(QMainWindow):
         for i, row in enumerate(self._rows):
             values = [
                 row.path.name,
-                row.format_label or "…",
+                self._row_label(row) if row.fmt_key or row.format_label else "…",
                 f"{row.points:,}" if row.points else "—",
                 row.x_range or "—",
                 row.peak or "—",
@@ -491,7 +551,7 @@ class MainWindow(QMainWindow):
             self._preview_info.setText(row.message or "")
             return
         data = row.data
-        sub = (f"{row.format_label}   ·   {len(data):,} pts   ·   "
+        sub = (f"{self._row_label(row)}   ·   {len(data):,} pts   ·   "
                f"{row.x_range}°   ·   λ={data.wavelength or 0:.4f} Å")
         note = ""
         if not row.axis_confident:
@@ -509,7 +569,8 @@ class MainWindow(QMainWindow):
             self._preview_info.setText("")
         if len(rows) > 1:
             self._preview_info.setText(
-                self._preview_info.text() + f"\n(已选 {len(rows)} 个文件, 只预览第一个)")
+                self._preview_info.text()
+                + "\n" + tr("tip.multi_preview", n=len(rows)))
 
     # ---- 交互 --------------------------------------------------------
 
@@ -557,7 +618,7 @@ class MainWindow(QMainWindow):
         act_axis = menu.addAction(tr("dlg.axis.title"))
         act_axis.setEnabled(rows[0].data is not None)
         menu.addSeparator()
-        act_open = menu.addAction("打开所在文件夹" if language() == "zh" else "Open containing folder")
+        act_open = menu.addAction(tr("ctx.open_dir"))
         act_rm = menu.addAction(tr("btn.remove"))
         chosen = menu.exec(self._table.viewport().mapToGlobal(pos))
         if chosen is act_axis:
@@ -623,8 +684,7 @@ class MainWindow(QMainWindow):
             jobs.append((i, src, dst, fmt, row.manual_axis))
 
         if not jobs:
-            self._log.appendPlainText("没有可转换的文件" if language() == "zh"
-                                      else "Nothing to convert.")
+            self._log.appendPlainText(tr("log.no_files"))
             return
 
         if existing:
@@ -640,7 +700,7 @@ class MainWindow(QMainWindow):
         self._progress.setValue(0)
         self._progress.setMaximum(len(jobs))
         self._set_busy(True)
-        self._log.appendPlainText(f"→ {len(jobs)} 个文件 → {fmt}")
+        self._log.appendPlainText(tr("log.batch", n=len(jobs), fmt=fmt))
 
         self._thread = QThread(self)
         self._worker = ConvertWorker(jobs)

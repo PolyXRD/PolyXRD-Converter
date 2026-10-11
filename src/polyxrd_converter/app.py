@@ -15,10 +15,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from polyxrd_converter import __app_name__, __version__
+from polyxrd_converter.i18n import tr
 from polyxrd_converter.ui_main import MainWindow
 
+# 日文字体要在 Microsoft YaHei 之后兜上, 否则 Win 中文系统上日文会掉字形回退成宋体风
 _STYLE = """
-QWidget { font-family: "Microsoft YaHei UI","Segoe UI",sans-serif; font-size: 9.5pt; }
+QWidget { font-family: "Microsoft YaHei UI","Yu Gothic UI","Meiryo UI","Segoe UI",sans-serif; font-size: 9.5pt; }
 QMainWindow, QDialog { background: #f4f6fa; }
 QGroupBox { background: #ffffff; border: 1px solid #dfe4ec; border-radius: 6px;
             margin-top: 6px; padding: 10px 8px 6px 8px; }
@@ -52,7 +54,7 @@ def _excepthook(exc_type, exc, tb) -> None:
     try:
         app = QApplication.instance()
         if app is not None:
-            QMessageBox.critical(None, "PolyXRD Converter - 未处理异常", text[-4000:])
+            QMessageBox.critical(None, tr("err.crash_title"), text[-4000:])
     except Exception:
         pass
 

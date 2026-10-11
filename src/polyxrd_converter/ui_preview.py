@@ -15,6 +15,8 @@ from PySide6.QtCore import QPoint, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
+from polyxrd_converter.i18n import tr
+
 _BG = QColor("#ffffff")
 _PANEL = QColor("#fbfcfe")
 _AXIS = QColor("#c3cad6")
@@ -146,7 +148,7 @@ class SpectrumView(QWidget):
         painter.setFont(QFont("Segoe UI", 10))
         painter.drawText(
             self.rect(), Qt.AlignmentFlag.AlignCenter,
-            "—  选择左侧文件即可预览  —\n(Select a file to preview)",
+            tr("preview.empty"),
         )
 
     def _draw_grid_and_axes(self, painter: QPainter) -> None:
