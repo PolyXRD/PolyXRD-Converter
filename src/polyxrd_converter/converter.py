@@ -12,6 +12,7 @@ from typing import Optional, Union
 
 import numpy as np
 
+from polyxrd_converter.i18n import fmt_label, tr
 from polyxrd_converter.loader import DataFormatError, detect_format, load_pattern
 from polyxrd_converter.model import XRDData
 from polyxrd_converter.writers import TARGET_EXTS, write_pattern
@@ -47,7 +48,8 @@ def probe(path: Union[str, Path], manual_axis: Optional[tuple[float, float]] = N
         key = "?"
 
     if not p.exists():
-        return ProbeResult(path=p, ok=False, format_key=key, message="文件不存在")
+        return ProbeResult(path=p, ok=False, format_key=key,
+                           message=tr("err.file_missing", path=str(p)))
 
     try:
         data = load_pattern(p, manual_axis=manual_axis)
@@ -105,7 +107,7 @@ def convert_file(
     if dst is None:
         key = (fmt or "xy").lower()
         if key not in TARGET_EXTS:
-            raise DataFormatError(f"不支持的导出格式: {key}")
+            raise DataFormatError(tr("err.unsupported_target", fmt=key))
         dst = src.with_suffix(TARGET_EXTS[key])
     else:
         dst = Path(dst)
@@ -116,16 +118,18 @@ def convert_file(
     except OSError:
         same = dst == src
     if same:
-        raise DataFormatError(f"输出文件与源文件是同一个文件, 会覆盖源文件: {dst}")
+        raise DataFormatError(tr("err.same_file", dst=str(dst)))
 
     # 角度轴不可信又没给手工值时, 不写出 —— 宁可失败, 也不产出峰位错误的谱图。
     if str(data.metadata.get("format")) == "raw" and not data.metadata.get(
         "axis_confident", True
     ):
+        variant = fmt_label(
+            str(data.metadata.get("raw_variant", "")),
+            fallback=str(data.metadata.get("raw_variant_label", "RAW")),
+        )
         raise DataFormatError(
-            f"{src.name}: 识别为 {data.metadata.get('raw_variant_label', 'RAW')}, "
-            f"已取出 {len(data)} 个强度点但**角度轴不可信**; "
-            "请右键该文件「手动指定角度轴」后再转换。"
+            tr("err.axis_required", name=src.name, variant=variant, n=len(data))
         )
 
     return write_pattern(data, dst, fmt)

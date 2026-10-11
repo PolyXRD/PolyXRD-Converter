@@ -15,22 +15,24 @@ from typing import Optional, Union
 
 import numpy as np
 
+from polyxrd_converter.i18n import tr
 from polyxrd_converter.model import XRDData
 
 __all__ = ["TARGET_FORMATS", "TARGET_EXTS", "write_pattern", "DataFormatError"]
 
 from polyxrd_converter.loader import DataFormatError
 
-#: (key, 扩展名, 展示名)。顺序 = UI 下拉顺序, 常用的放前面。
+#: (key, 扩展名, i18n 文案 key)。顺序 = UI 下拉顺序, 常用的放前面。
+#: 展示名不写死在这里 —— 由 UI 取到后用 ``tr(label)`` 按当前语言翻译, 避免三语文案漂移。
 TARGET_FORMATS: tuple[tuple[str, str, str], ...] = (
-    ("xy", ".xy", "两列文本 2θ/I (.xy)"),
-    ("txt", ".txt", "两列文本 2θ/I (.txt)"),
-    ("dat", ".dat", "两列文本 2θ/I (.dat)"),
-    ("csv", ".csv", "CSV 带表头 (.csv)"),
-    ("mdi", ".mdi", "MDI / Jade (.mdi)"),
-    ("raw", ".raw", "RAW2 二进制 (.raw)"),
-    ("xrdml", ".xrdml", "Bruker XRDML (.xrdml)"),
-    ("json", ".json", "PolyXRD 谱图 JSON (.json)"),
+    ("xy", ".xy", "tgt.xy"),
+    ("txt", ".txt", "tgt.txt"),
+    ("dat", ".dat", "tgt.dat"),
+    ("csv", ".csv", "tgt.csv"),
+    ("mdi", ".mdi", "tgt.mdi"),
+    ("raw", ".raw", "tgt.raw"),
+    ("xrdml", ".xrdml", "tgt.xrdml"),
+    ("json", ".json", "tgt.json"),
 )
 
 TARGET_EXTS: dict[str, str] = {k: e for k, e, _ in TARGET_FORMATS}
@@ -52,12 +54,10 @@ def _uniform_step(two_theta: np.ndarray) -> float:
     """取等间距 2θ 的步长; 非等间距时抛错 (MDI/RAW2 是等间距通道格式)。"""
     diffs = np.diff(np.asarray(two_theta, dtype=float))
     if diffs.size == 0:
-        raise DataFormatError("数据点不足, 无法写入等间距格式")
+        raise DataFormatError(tr("err.too_few_points"))
     step = float(np.median(diffs))
     if step <= 0 or not np.allclose(diffs, step, rtol=1e-6, atol=step * 1e-6):
-        raise DataFormatError(
-            "数据不是等间距 2θ, 无法写入 MDI/RAW2; 请改用 .xy/.txt/.dat/.csv"
-        )
+        raise DataFormatError(tr("err.not_equidistant"))
     return step
 
 

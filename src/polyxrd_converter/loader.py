@@ -17,6 +17,7 @@ from typing import Optional, Union
 
 import numpy as np
 
+from polyxrd_converter.i18n import fmt_label as _L, tr
 from polyxrd_converter.model import XRDData
 from polyxrd_converter.raw_formats import parse_raw
 
@@ -27,25 +28,26 @@ class DataFormatError(ValueError):
     """数据格式不支持或解析失败。"""
 
 
-#: 内部 key → 界面展示名
+#: 内部 key → i18n 文案 key。展示名统一经 ``i18n.fmt_label`` 翻译, 这里只存 key,
+#: 避免同一份名称在两张表里漂移 (缺译文时回退到 fallback)。
 FORMAT_LABELS: dict[str, str] = {
-    "xy": "文本两列 (.xy)",
-    "txt": "文本 (.txt)",
-    "dat": "文本 (.dat)",
-    "csv": "CSV (.csv)",
-    "smz": "文本 (.smz)",
-    "mdi": "MDI / Jade (.mdi)",
-    "jade_txt": "MDI / Jade 文本导出 (.txt)",
-    "gsas": "GSAS 粉末数据 (.gsas/.fxye/.gda)",
-    "fp_dat": "FullProf .dat",
-    "ras": "理学 Rigaku .ras/.rasx",
-    "xye": "Topas .xye/.qye",
-    "chi": "Fit2D .chi/.qchi",
-    "xrdml": "Bruker XRDML (.xrdml/.xml)",
-    "brml": "Bruker BRML (.brml)",
-    "json": "PolyXRD 谱图 JSON (.json)",
-    "shimadzu_txt": "岛津 ASCII 导出 (.txt/.asc)",
-    "raw": "RAW 二进制",
+    "xy": "fmt.xy",
+    "txt": "fmt.txt",
+    "dat": "fmt.dat",
+    "csv": "fmt.csv",
+    "smz": "fmt.smz",
+    "mdi": "fmt.mdi",
+    "jade_txt": "fmt.jade_txt",
+    "gsas": "fmt.gsas",
+    "fp_dat": "fmt.fp_dat",
+    "ras": "fmt.ras",
+    "xye": "fmt.xye",
+    "chi": "fmt.chi",
+    "xrdml": "fmt.xrdml",
+    "brml": "fmt.brml",
+    "json": "fmt.json",
+    "shimadzu_txt": "fmt.shimadzu_txt",
+    "raw": "fmt.raw",
 }
 
 #: 文本类格式
@@ -126,7 +128,8 @@ def detect_format(path: Union[str, Path]) -> tuple[str, str]:
     """按扩展名 + 文件头嗅探格式。
 
     Returns:
-        ``(key, label)`` —— ``key`` 见 :data:`FORMAT_LABELS`
+        ``(key, label)`` —— ``key`` 见 :data:`FORMAT_LABELS`; ``label`` 是按当前
+        UI 语言翻译后的展示名 (经 :func:`~polyxrd_converter.i18n.fmt_label`)。
     """
     p = Path(path)
     ext = p.suffix.lower()
@@ -136,63 +139,63 @@ def detect_format(path: Union[str, Path]) -> tuple[str, str]:
         head = b""
 
     if ext == ".raw":
-        return "raw", FORMAT_LABELS["raw"]
+        return "raw", _L("raw")
     # 岛津 Shimadzu 私有容器的魔数决断: 它的 .raw/.org/.rsm/.rbg/.rk1/.rax/
     # .rlz/.rfi 共用同一结构 (见 raw_formats.ShimadzuRawParser), 靠扩展名分不干净。
     # 魔数极特异, 放最前面按魔数认, 不看扩展名。
     if head[:12] == b"Shimadzu XRD":
-        return "raw", FORMAT_LABELS["raw"]
+        return "raw", _L("raw")
     if ext == ".brml":
-        return "brml", FORMAT_LABELS["brml"]
+        return "brml", _L("brml")
     if ext in (".xrdml", ".xml"):
-        return "xrdml", FORMAT_LABELS["xrdml"]
+        return "xrdml", _L("xrdml")
     if ext == ".mdi":
-        return "mdi", FORMAT_LABELS["mdi"]
+        return "mdi", _L("mdi")
     if ext == ".json":
-        return "json", FORMAT_LABELS["json"]
+        return "json", _L("json")
 
     text_head = head.decode("utf-8", "ignore").lower()
     if any(m in text_head for m in _SHIMADZU_MARKERS):
-        return "shimadzu_txt", FORMAT_LABELS["shimadzu_txt"]
+        return "shimadzu_txt", _L("shimadzu_txt")
     if text_head.lstrip().startswith("<"):
-        return "xrdml", FORMAT_LABELS["xrdml"]
+        return "xrdml", _L("xrdml")
 
     # Jade/MDI 两行头文本导出 (Jade 的 .txt/.dat 常见): 头里带 start/step/靶材。
     # 必须在"按扩展名当两列文本"之前判掉, 否则单列定宽强度会被读成两列 → 假轴。
     if _jade_head(head.decode("utf-8", "ignore").splitlines()) is not None:
-        return "jade_txt", FORMAT_LABELS["jade_txt"]
+        return "jade_txt", _L("jade_txt")
 
     # --- GSAS-II 系文本格式 (gsas / fp_dat / ras / xye / chi) ---
     if ext == ".rasx":
-        return "ras", FORMAT_LABELS["ras"]
+        return "ras", _L("ras")
     if ext == ".ras" and head.decode("latin-1", "ignore").lstrip().startswith(
             "*RAS_DATA_START"):
-        return "ras", FORMAT_LABELS["ras"]
+        return "ras", _L("ras")
     head_lines_l1 = head.decode("latin-1", "ignore").splitlines()
     if ext in (".fxye", ".gsas", ".gda", ".gsa", ".gss") and _gsas_banks(head_lines_l1):
-        return "gsas", FORMAT_LABELS["gsas"]
+        return "gsas", _L("gsas")
     if ext in (".xye", ".qye"):
-        return "xye", FORMAT_LABELS["xye"]
+        return "xye", _L("xye")
     if ext in (".chi", ".qchi"):
-        return "chi", FORMAT_LABELS["chi"]
+        return "chi", _L("chi")
     if ext == ".dat":
         # .dat 四义: Jade 头 (上面已判) / GSAS BANK / FullProf 头 / 普通两列文本。
         if _gsas_banks(head_lines_l1):
-            return "gsas", FORMAT_LABELS["gsas"]
+            return "gsas", _L("gsas")
         # FullProf 判定需要全量数据做 stop 自洽校验 (头嗅探 4KB 不够), .dat 都是小文本
         try:
             full_lines = p.read_text(encoding="utf-8-sig", errors="ignore").splitlines()
         except OSError:
             full_lines = []
         if _fp_head(full_lines) is not None:
-            return "fp_dat", FORMAT_LABELS["fp_dat"]
+            return "fp_dat", _L("fp_dat")
 
     if ext in (".xy", ".txt", ".dat", ".csv", ".smz"):
         key = ext.lstrip(".")
-        return key, FORMAT_LABELS[key]
+        return key, _L(key)
 
     # 未知扩展名: 有数值就当两列文本
-    return "txt", FORMAT_LABELS["txt"]
+    return "txt", _L("txt")
 
 
 # ----------------------------------------------------------------------
@@ -204,14 +207,11 @@ def _read_numeric_rows(path: Path) -> tuple[list[list[float]], list[str]]:
     text = path.read_text(encoding="utf-8-sig", errors="ignore")
     lines = text.splitlines()
     if not lines:
-        raise DataFormatError(f"空文件: {path}")
+        raise DataFormatError(tr("err.empty_file", path=str(path)))
 
     # 防御: 拒绝 JADE/PDF 物相识别报告 (不是衍射强度数据, 误读会产生虚假峰)
     if "phase id report" in "".join(lines[:40]).lower():
-        raise DataFormatError(
-            f"{path} 是 JADE/PDF 物相识别报告, 不含衍射强度数据; "
-            "请改用对应的 .raw / .mdi / .xy 原始谱图文件。"
-        )
+        raise DataFormatError(tr("err.jade_report", path=str(path)))
 
     rows: list[list[float]] = []
     for raw_line in lines:
@@ -231,7 +231,7 @@ def _read_numeric_rows(path: Path) -> tuple[list[list[float]], list[str]]:
         if ok and len(vals) >= 2:
             rows.append(vals)
     if not rows:
-        raise DataFormatError(f"文件 {path} 中没有有效数值数据")
+        raise DataFormatError(tr("err.no_numeric", path=str(path)))
     return rows, lines
 
 
@@ -318,7 +318,7 @@ def _load_mdi(path: Path, key: str = "mdi") -> XRDData:
     text = path.read_text(encoding="utf-8-sig", errors="ignore")
     lines = [ln for ln in text.splitlines() if ln.strip()]
     if len(lines) < 2:
-        raise DataFormatError(f"MDI 文件内容不足: {path}")
+        raise DataFormatError(tr("err.mdi_too_short", path=str(path)))
 
     head = lines[1]
     head_nums: list[float] = []
@@ -328,7 +328,7 @@ def _load_mdi(path: Path, key: str = "mdi") -> XRDData:
         except ValueError:
             continue
     if len(head_nums) < 2:
-        raise DataFormatError(f"MDI 文件头无法解析 start/step: {path}")
+        raise DataFormatError(tr("err.mdi_head", path=str(path)))
     start, step = head_nums[0], head_nums[1]
 
     values: list[float] = []
@@ -339,7 +339,7 @@ def _load_mdi(path: Path, key: str = "mdi") -> XRDData:
             except ValueError:
                 continue
     if len(values) < 2:
-        raise DataFormatError(f"MDI 文件没有有效强度数据: {path}")
+        raise DataFormatError(tr("err.mdi_no_data", path=str(path)))
     intensity = np.asarray(values, dtype=float)
     n = len(intensity)
 
@@ -464,8 +464,7 @@ def _q_to_two_theta(q: np.ndarray, wavelength: float) -> np.ndarray:
     arg = wavelength * np.asarray(q, dtype=float) / (4.0 * np.pi)
     if float(arg.max()) > 1.0:
         raise DataFormatError(
-            f"Q 值超出波长 λ={wavelength}Å 的可换算范围 (λQ/4π 最大 {arg.max():.3f} > 1);"
-            " 波长注释可能不对, 请核对后重试。"
+            tr("err.q_out_of_range", wavelength=wavelength, vmax=f"{arg.max():.3f}")
         )
     return 2.0 * np.degrees(np.arcsin(arg))
 
@@ -484,20 +483,14 @@ def _load_gsas(path: Path) -> XRDData:
     # latin-1 逐字节解码: ESD/STD 是定宽格式, 字节偏移即字符偏移
     text = path.read_bytes().decode("latin-1", errors="ignore")
     if "TIME_MAP" in text:
-        raise DataFormatError(
-            f"{path.name} 是中子飞行时间 (TOF) GSAS 数据 (含 TIME_MAP), "
-            "横轴是飞行时间不是 2θ; 本工具不支持。"
-        )
+        raise DataFormatError(tr("err.gsas_tof", name=path.name))
     lines = text.splitlines()
     banks = _gsas_banks(lines)
     if not banks:
-        raise DataFormatError(f"GSAS 文件没有 BANK 记录: {path}")
+        raise DataFormatError(tr("err.gsas_no_bank", path=str(path)))
     bank_line, di = banks[0]
     if "EDS" in bank_line or "ALT" in bank_line:
-        raise DataFormatError(
-            f"{path.name} 是能量色散 (EDS) 或飞行时间类 (ALT) GSAS 数据, "
-            "横轴不是 2θ; 本工具不支持。"
-        )
+        raise DataFormatError(tr("err.gsas_eds_alt", name=path.name))
     cons = bank_line.split()
     start = step = None
     if len(cons) >= 7:
@@ -521,7 +514,7 @@ def _load_gsas(path: Path) -> XRDData:
             ys.append(float(parts[1]))
     elif "ESD" in bank_line:
         if start is None:
-            raise DataFormatError(f"ESD bank 缺 start/step 字段: {bank_line.rstrip()!r}")
+            raise DataFormatError(tr("err.gsas_esd_fields", line=bank_line.rstrip()))
         for ln in lines[di:]:
             if ln[:4] == "BANK" or ln.startswith("#"):
                 break
@@ -534,7 +527,7 @@ def _load_gsas(path: Path) -> XRDData:
                 j += 1
     else:  # STD (缺省类型, 与 GSAS-II 的兜底一致)
         if start is None:
-            raise DataFormatError(f"STD bank 缺 start/step 字段: {bank_line.rstrip()!r}")
+            raise DataFormatError(tr("err.gsas_std_fields", line=bank_line.rstrip()))
         for ln in lines[di:]:
             if ln[:4] == "BANK" or ln.startswith("#"):
                 break
@@ -547,7 +540,7 @@ def _load_gsas(path: Path) -> XRDData:
                 j += 1
 
     if len(xs) < 2:
-        raise DataFormatError(f"GSAS 文件有效数据点不足: {path}")
+        raise DataFormatError(tr("err.gsas_too_short", path=str(path)))
     bank_type = next((t for t in ("FXYE", "FXY", "ESD", "STD", "ALT") if t in bank_line),
                      "STD")
     return XRDData(
@@ -622,7 +615,7 @@ def _load_fp_dat(path: Path) -> XRDData:
                 stopped = True
                 break
     if start is None or len(xs) < 2:
-        raise DataFormatError(f"FullProf .dat 没有有效数据 (缺 start/step/stop 头?): {path}")
+        raise DataFormatError(tr("err.fp_no_data", path=str(path)))
     return XRDData(
         two_theta=np.asarray(xs, dtype=float),
         intensity=np.asarray(ys, dtype=float),
@@ -656,7 +649,7 @@ def _load_ras(path: Path) -> XRDData:
                     (n for n in names
                      if n.lower().endswith(".txt") and "profile" in n.lower()), None)
                 if prof is None:
-                    raise DataFormatError(f"rasx 里找不到 Profile*.txt 成员: {path}")
+                    raise DataFormatError(tr("err.rasx_no_member", path=str(path)))
                 text = zf.read(prof).decode("utf-8-sig", "ignore")
                 xml_name = next((n for n in names if n.lower().endswith(".xml")), None)
                 if xml_name:
@@ -665,11 +658,11 @@ def _load_ras(path: Path) -> XRDData:
                     if m:
                         wl = float(m.group(1))
         except zipfile.BadZipFile as exc:
-            raise DataFormatError(f"rasx 不是合法 ZIP: {path} ({exc})") from exc
+            raise DataFormatError(tr("err.rasx_bad_zip", path=str(path), exc=exc)) from exc
     else:
         text = path.read_bytes().decode("latin-1", errors="ignore")
         if not text.lstrip().startswith("*RAS_DATA_START"):
-            raise DataFormatError(f"不是 Rigaku .ras 文件 (缺 *RAS_DATA_START): {path}")
+            raise DataFormatError(tr("err.ras_no_marker", path=str(path)))
         m = re.search(r"(?i)wavelength\D{0,40}?(\d+\.\d+)", text)
         if m:
             wl = float(m.group(1))
@@ -698,7 +691,7 @@ def _load_ras(path: Path) -> XRDData:
         except ValueError:
             continue
     if len(xs) < 2:
-        raise DataFormatError(f"Rigaku .ras/.rasx 没有有效数据行: {path}")
+        raise DataFormatError(tr("err.ras_no_rows", path=str(path)))
     return XRDData(
         two_theta=np.asarray(xs, dtype=float),
         intensity=np.asarray(ys, dtype=float),
@@ -731,10 +724,7 @@ def _load_xye(path: Path) -> XRDData:
             if wl:
                 break
         if wl is None:
-            raise DataFormatError(
-                f"{path.name} 是 Q 轴 .qye 文件, 但注释里没有 '#wavelength <λ>' 行, "
-                "无法换算成 2θ; 请在文件头补一行 '#wavelength <波长Å>'。"
-            )
+            raise DataFormatError(tr("err.xye_no_wavelength", name=path.name))
 
     got_c = False
     xs: list[float] = []
@@ -766,7 +756,7 @@ def _load_xye(path: Path) -> XRDData:
         except ValueError:
             continue
     if len(xs) < 2:
-        raise DataFormatError(f"xye/qye 文件没有有效数据行: {path}")
+        raise DataFormatError(tr("err.xye_no_rows", path=str(path)))
     two_theta = np.asarray(xs, dtype=float)
     intensity = np.asarray(ys, dtype=float)
     if is_q:
@@ -804,14 +794,9 @@ def _load_chi(path: Path) -> XRDData:
                 mode = "q"
                 break
     if mode is None:
-        raise DataFormatError(
-            f"不是 Fit2D .chi 文件 (头 4 行里没有 2-theta/q 标识): {path}"
-        )
+        raise DataFormatError(tr("err.chi_not_fit2d", path=str(path)))
     if mode == "q" and wl is None:
-        raise DataFormatError(
-            f"{path.name} 是 Q 轴 .qchi 文件, 但头里没给波长 (应为 'q <λ>' 形式), "
-            "无法换算成 2θ。"
-        )
+        raise DataFormatError(tr("err.chi_no_wavelength", name=path.name))
     xs: list[float] = []
     ys: list[float] = []
     # 数据行 = 全文件里"恰好两列数值"的行: Fit2D 标准头 4 行与 pyFAI 简化头
@@ -830,7 +815,7 @@ def _load_chi(path: Path) -> XRDData:
         except ValueError:
             continue
     if len(xs) < 2:
-        raise DataFormatError(f"chi 文件没有有效数据行: {path}")
+        raise DataFormatError(tr("err.chi_no_rows", path=str(path)))
     two_theta = np.asarray(xs, dtype=float)
     if mode == "q":
         two_theta = _q_to_two_theta(two_theta, wl)
@@ -911,7 +896,7 @@ def _load_xrdml(path: Path) -> XRDData:
     try:
         root = ET.parse(str(path)).getroot()
     except ET.ParseError as exc:
-        raise DataFormatError(f"XML 解析失败: {path} ({exc})") from exc
+        raise DataFormatError(tr("err.xrdml_xml_fail", path=str(path), exc=exc)) from exc
 
     two_theta, intensity = _xml_arrays(root)
 
@@ -931,7 +916,7 @@ def _load_xrdml(path: Path) -> XRDData:
                 intensity = np.array(numbers[half:half * 2])
 
     if two_theta is None or intensity is None:
-        raise DataFormatError(f"无法从 XRDML 文件提取 2θ / 强度数据: {path}")
+        raise DataFormatError(tr("err.xrdml_no_data", path=str(path)))
 
     m = min(len(two_theta), len(intensity))
     return XRDData(
@@ -954,15 +939,15 @@ def _load_brml(path: Path) -> XRDData:
             if not data_files:
                 data_files = [f for f in names if f.lower().endswith(".xml")]
             if not data_files:
-                raise DataFormatError(f"BRML 文件里找不到 XML 数据: {path}")
+                raise DataFormatError(tr("err.brml_no_xml", path=str(path)))
             xml_text = zf.read(data_files[0]).decode("utf-8-sig", "ignore")
     except zipfile.BadZipFile as exc:
-        raise DataFormatError(f"BRML 解析失败 (不是合法 ZIP): {path} ({exc})") from exc
+        raise DataFormatError(tr("err.brml_bad_zip", path=str(path), exc=exc)) from exc
 
     try:
         root = ET.parse(io.StringIO(xml_text)).getroot()
     except ET.ParseError as exc:
-        raise DataFormatError(f"BRML 内 XML 解析失败: {path} ({exc})") from exc
+        raise DataFormatError(tr("err.brml_xml_fail", path=str(path), exc=exc)) from exc
 
     two_theta, intensity = _xml_arrays(root)
     if two_theta is None or intensity is None:
@@ -992,7 +977,7 @@ def _load_brml(path: Path) -> XRDData:
         intensity = np.array(cnt) if cnt else None
 
     if two_theta is None or intensity is None:
-        raise DataFormatError(f"无法从 BRML 文件提取数据: {path}")
+        raise DataFormatError(tr("err.brml_no_data", path=str(path)))
 
     m = min(len(two_theta), len(intensity))
     return XRDData(
@@ -1008,9 +993,9 @@ def _load_json(path: Path) -> XRDData:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise DataFormatError(f"JSON 解析失败: {path} ({exc})") from exc
+        raise DataFormatError(tr("err.json_parse_fail", path=str(path), exc=exc)) from exc
     if not isinstance(payload, dict) or "two_theta" not in payload:
-        raise DataFormatError(f"{path} 不是谱图 JSON (缺 two_theta 字段)")
+        raise DataFormatError(tr("err.json_not_pattern", path=str(path)))
     data = XRDData.from_dict(payload)
     data.metadata.setdefault("format", "json")
     return data
@@ -1038,7 +1023,7 @@ def load_pattern(
     """
     p = Path(path)
     if not p.exists():
-        raise FileNotFoundError(f"文件不存在: {p}")
+        raise FileNotFoundError(tr("err.file_missing", path=str(p)))
 
     key, label = detect_format(p)
     try:
@@ -1095,7 +1080,7 @@ def load_pattern(
     except (DataFormatError, FileNotFoundError):
         raise
     except Exception as exc:  # noqa: BLE001 - 统一成 DataFormatError 便于 GUI 展示
-        raise DataFormatError(f"读取 {p.name} 失败: {exc}") from exc
+        raise DataFormatError(tr("err.read_failed", name=p.name, exc=exc)) from exc
 
     if wavelength is not None:
         data.wavelength = wavelength
