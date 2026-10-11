@@ -1,7 +1,8 @@
-# PolyXRD Converter 转交记录（Handover）— 截至 v1.1.0
+# PolyXRD Converter 转交记录（Handover）— 截至 v1.4.0
 
-> 撰写日期：2026-10-10 ｜ 对应版本：v1.1.0（commit `86d27cd`，Release id 408470845）
+> 撰写日期：2026-10-10 ｜ 最近更新：2026-10-12 ｜ 当前对应版本：**v1.4.0**（commit `fc11da4`，Release id 409972391）
 > 读者：接手本项目的后续开发者 / 协作模型。读完本文应能独立完成"改一个解析器 → 验证 → 发版"全流程。
+> 维护约定：本文是**持续更新的活文档**（文件名不挂版本号），每次发版只需更新 §1 能力矩阵、§4.1 断言数、§5 进展表、§7 已知问题；§6 踩坑只增不删。
 
 ---
 
@@ -76,7 +77,7 @@ __init__.py             __version__ 单源（唯一版本号出处）
 
 ## 4. 每个拆分步骤的测试边界与验收方法
 
-### 4.1 验收矩阵（tests/validate_samples.py，当前 247 项断言全绿）
+### 4.1 验收矩阵（tests/validate_samples.py，当前 607 项断言全绿）
 
 | 验收块 | 数据来源 | 断言边界 |
 |---|---|---|
@@ -86,6 +87,9 @@ __init__.py             __version__ 单源（唯一版本号出处）
 | 岛津容器 | `XRData/Shimadzu Data` 72 个 .RAW + 39 个伴随扩展名 | 全解析成功且轴全部可信；**5 组与厂商 ASCII 导出逐点比对：强度全等、2θ 差 <3e-14**；峰表（PKR 等）明确拒绝；负角/步长截断/变长头边界回归；**合成截断回归**（手工 struct.pack 构造完整/截断文件：钳点数、truncated=True、axis_confident=False、保留点逐值全等） |
 | 往返守恒 | 8 种格式 | 任意 读→写→读 点数与数值守恒 |
 | MDI/Jade | 文本导出 | 按头建轴 + 靶材记号/波长交叉校验 |
+| `_fmt_pair` 两列粘连 | 合成 | 正常行字节一致；强度占满 10 字符场宽时补分隔符；端到端 `np.loadtxt` 仍能读到 2 列 |
+| GSAS-II 系格式 | 14 个合成样本 + GSAS-II 本体 oracle | 5 类格式（FXYE/FXY/ESD/STD、FullProf、ras/rasx、xye/qye、chi/qchi）逐点读入正确；TOF(TIME_MAP) 明确拒绝；自写两列 `.dat` 仍按纯文本读（FP 误判守卫） |
+| 三语一致性 | i18n 三张表 | 139 个 key 三表齐平；占位符同名同数量且每条都能 `format` 通；占位符不与 `tr()` 形参撞名；格式名/目标格式名三语均有译文；抽 6 条核心文案做「三语互不相同」守卫 |
 
 ### 4.2 真值从哪来（后续加格式时的关键）
 
@@ -97,7 +101,7 @@ __init__.py             __version__ 单源（唯一版本号出处）
 
 ```bash
 venv/Scripts/python.exe tests/validate_samples.py   # 1) 全量断言（需 XRData 在位）
-venv/Scripts/python.exe tests/smoke_gui.py          # 2) GUI 离屏冒烟 40 项
+venv/Scripts/python.exe tests/smoke_gui.py          # 2) GUI 离屏冒烟 50 项
 # 3) 冻结 exe（构建后）：--selftest 真样本 --report out.txt，exit 0 + RESULT ok=N
 ./dist/PolyXRDConverter.exe --selftest "样本A" "样本B" --report selftest_report.txt
 # 4) GUI 存活冒烟：启动 exe → 12s 后 tasklist 有进程 → taskkill
@@ -108,7 +112,7 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 
 ---
 
-## 5. 当前进展（截至 2026-10-10）
+## 5. 当前进展（截至 2026-10-12）
 
 | 版本 | 日期 | commit | 内容 | 验证 |
 |---|---|---|---|---|
@@ -116,9 +120,11 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 | v1.1.0 | 2026-10-10 | `86d27cd` | **岛津 .RAW 解析精度升级**：截断文件防护（钳点数+`truncated` 全链路透出）、截断轴强制转人工、「end 差一步长」约定精确化 | 247 断言 + 冒烟 40 + 主项目对拍 206 文件强度全等 + smz geshi 13 对逐点全等 |
 | v1.2.0 | 2026-10-10 | `4b33f48` | **P1 + P2**：修复 `writers._fmt_pair` 两列粘连（高强度/大整数样本不再塌缩成单列）；新增 θ 单轴摇摆扫描 GUI 提示 | 252 断言 + 冒烟 40 + 冻结 exe 真样本自检 10/10 全过 |
 | v1.3.0 | 2026-10-10 | `bf6707a` | **GSAS-II 系格式移植**：新增 gsas / fp_dat / ras(.rasx) / xye / chi 五类文本读取器（格式知识参考 GSAS-II 开源 importer，按其许可注明来源） | 311 断言 + 冒烟 40 + 冻结 exe 自检 10/10；另与 GSAS-II 本体 oracle 对拍 |
-| v1.4.0 | 2026-10-12 | 见下 | **界面三语化 + 即时切换**：新增日本語；原来切语言只改全局量、控件要重启才更新，现由 `_retranslate_ui()` 重译菜单/控件/清单/预览；格式名与目标格式名改由 key 动态翻译；读取层 30 条报错全部入表 | 607 断言（含三语一致性专项）+ 冒烟 50 + 冻结 exe 自检 10/10 |
+| v1.4.0 | 2026-10-12 | `fc11da4` | **界面三语化 + 即时切换**：新增日本語；原来切语言只改全局量、控件要重启才更新，现由 `_retranslate_ui()` 重译菜单/控件/清单/预览；格式名与目标格式名改由 key 动态翻译；读取层 30 条报错全部入表 | 607 断言（含三语一致性专项）+ 冒烟 50 + 冻结 exe 自检 10/10 |
 
 **发布状态**：v1.4.0 已推送 GitHub 并发布 Release（exe + SHA256，哈希回下载闭环一致）。工作树干净（仅 `.workbuddy/` 未跟踪），无未推送提交，无遗留任务。
+
+**文档同步状态（2026-10-12 全量核对）**：README（版本/下载/三语/文档入口）、本文、GitHub 仓库简介与 topics、各版本 Release 正文均已对齐 v1.4.0；顺带修掉 v1.3.0/v1.4.0 Release 里误写的「MIT」许可口径（见 §8 备忘）。
 
 **GSAS-II oracle 对拍**（v1.3.0 一次性验证，结论沉淀在此）：用 `C:/gsas2main/python.exe` + `sys.path` 指其 `GSAS-II` 目录可调 GSAS-II 的 importer 当参考实现；14 个合成样本中 **10 个与 GSAS-II 逐点全等（dx=dy=0）**，4 个 SKIP 均为 GSAS-II 自身缺陷（见 §6.4）。
 
@@ -183,6 +189,8 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 ## 8. 备忘
 
 - **仓库/远程**：`github.com/PolyXRD/PolyXRD-Converter.git`（HTTPS），凭据走 git credential store；Release 仅发 exe + SHA256。
+- **文档清单（改版本号/加格式时，这几处要一起改）**：① `README.md`（功能/版本下载/验证断言数）；② 本文（§1 能力矩阵、§4.1 断言数与验收块、§4.3 冒烟项数、§5 进展表、§7 已知问题）；③ `pyproject.toml`（description / keywords）；④ GitHub 仓库简介与 topics；⑤ 新版本的 Release 正文。
+- **许可口径（别写错）**：本项目是**双许可**（学术研究/教学免费，商业用途须单独书面授权），**不是 MIT**。v1.3.0 / v1.4.0 的 Release 正文曾误写成 "MIT（见 LICENSE）"，2026-10-12 已纠正；写 Release/文档时照抄 `README.md` 的「许可」一节最稳。GSAS-II 系读取器另有上游署名要求（UChicago Argonne, LLC）。。
 - **本地路径**：项目 `D:/Project/XRD/PolyXRD-Converter`；真机样本 `D:/Project/XRD/XRData`、`D:/Project/XRD/test_xrd`；主项目 `D:/Project/XRD/PolyXRD`（其 venv 可用于跨项目对拍，numpy 兼容）。
 - **环境**：项目自带 `venv/`（Python 3.10.11，numpy + PySide6 + pyinstaller）；Git Bash 为主 shell；Python 一律 `venv/Scripts/python.exe`。
 - **构建**：`build.bat`（或分步）→ `dist/PolyXRDConverter.exe`；版本号单源 `src/polyxrd_converter/__init__.py`，build.bat 动态读取。

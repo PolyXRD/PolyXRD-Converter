@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "polyxrd-converter"
-description = "PolyXRD Converter —— XRD 谱图格式转换器 (多厂商 RAW 自动识别)"
+description = "PolyXRD Converter —— XRD 谱图格式转换器 (多厂商 RAW 自动识别 + GSAS-II 系文本格式, 中/英/日三语界面)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "PolyXRD Team", email = "sshztx@outlook.com" }]
-keywords = ["XRD", "powder diffraction", "RAW", "format converter", "Rigaku", "Bruker", "Scintag"]
+keywords = ["XRD", "powder diffraction", "RAW", "format converter", "Rigaku", "Bruker",
+            "Scintag", "Shimadzu", "GSAS-II", "FullProf", "Fit2D", "i18n"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",

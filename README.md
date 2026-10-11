@@ -2,6 +2,8 @@
 
 **XRD 谱图格式转换器** —— 从 [PolyXRD](https://github.com/PolyXRD/PolyXRD) 独立剥离的轻量小工具：把各种厂商/软件导出的谱图文件互转成你需要的目标格式，**多厂商 RAW 二进制自动识别**，双击即用，无需安装。
 
+**当前版本 v1.4.0** ｜ [下载最新 exe](https://github.com/PolyXRD/PolyXRD-Converter/releases/latest)（单文件，约 55 MB，附 SHA-256） ｜ 界面语言：简体中文 / English / 日本語
+
 <div align="center"><img src="src/polyxrd_converter/resources/icon.png" alt="PolyXRD Converter" width="96"></div>
 
 ## 功能
@@ -43,6 +45,7 @@
 2. 表格自动识别每个文件的格式、点数、2θ 范围、最强峰强度
 3. 选中任一行即可在右侧预览谱图
 4. 选目标格式 + 输出目录 → 「开始转换」
+5. 切界面语言：菜单栏「语言」→ 简体中文 / English / 日本語，**即时生效**，无需重启
 
 带参启动（拖文件到 exe 图标上等效）：
 
@@ -82,6 +85,10 @@ python tests/smoke_gui.py            # GUI 离屏冒烟 50 项
 - 8 种格式往返守恒
 - **三语一致性（v1.4.0）**：139 条文案 × 3 语言的 key 集合齐平、占位符同名同数量、每条都能 `format` 通过；读取/写出格式名在三种语言下均有译文；抽取按钮/菜单/「关于」等 6 条做「三语互不相同」守卫（防整表复制没改）。另有 3 项针对 UI 的冒烟断言：切到 ja/en/zh 后按钮、表头、菜单栏、目标格式下拉、已载入行的「识别格式」列全部即时重译
 
+## 文档
+
+- [`docs/交接记录-HANDOVER.md`](docs/交接记录-HANDOVER.md) —— **项目转交记录**：项目定位、模块分层、RAW 解析器注册表、验收矩阵与真值来源、版本进展、19 条踩坑经验、已知问题（接手开发 / 协作模型必读）
+
 ## 开发
 
 ```bash
@@ -90,6 +97,11 @@ venv\Scripts\pip install -e . pyinstaller
 python main.py                 # 源码运行
 build.bat                      # 打包单文件 exe
 ```
+
+### 加一种新语言
+
+在 `src/polyxrd_converter/i18n.py` 里加一张与 `ZH` 同 key 的表、把它挂进 `_LANGS` 与 `LANGS` 即可，语言菜单自动生成。
+key 集合与占位符的一致性由 `tests/validate_samples.py::validate_i18n` 把关（漏 key 时 `tr()` 会静默回退中文）。
 
 ## 依赖
 
