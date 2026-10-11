@@ -25,6 +25,7 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 from polyxrd_converter import __version__  # noqa: E402
 from polyxrd_converter.app import _STYLE  # noqa: E402
 from polyxrd_converter.converter import convert_file, probe  # noqa: E402
+from polyxrd_converter.i18n import language, tr  # noqa: E402
 from polyxrd_converter.loader import load_pattern  # noqa: E402
 from polyxrd_converter.ui_main import MainWindow  # noqa: E402
 from polyxrd_converter.ui_preview import SpectrumView, _nice_step  # noqa: E402
@@ -215,10 +216,48 @@ def main() -> int:
         ok_rows = [r for r in win._rows if r.status == "ok"]
         check(len(ok_rows) == len(want), f"表格状态更新为 ok 的行数 = {len(ok_rows)}")
 
-    # --- 6) 语言切换不崩 ---
-    print("\n=== 6) 语言切换 & 清理 ===")
-    win._act_en.setChecked(True)
-    check(True, "英文动作创建成功")
+    # --- 6) 三语切换即时生效 (不重启) ---
+    print("\n=== 6) 中/英/日 三语切换 & 清理 ===")
+    check(len(win._lang_actions) == 3,
+          f"语言菜单含 3 项: {[a.text() for a in win._lang_actions.values()]}")
+    # 前面的用例已载入 4 个样本 (第 0 行是岛津 Si.RAW), 这里直接拿它做格式列的语言对照
+    check(win._table.rowCount() >= 1 and win._table.item(0, 1) is not None,
+          f"列表已有样本可用于格式列对照 (行数={win._table.rowCount()})")
+
+    expect = {
+        "ja": ("変換開始", "ファイル", "ファイル(&F)"),
+        "en": ("Convert", "File", "&File"),
+        "zh": ("开始转换", "文件", "文件(&F)"),
+    }
+    for code, (btn, head, menu) in expect.items():
+        win._switch_lang(code)
+        pump(5)
+        got = (win._btn_convert.text(),
+               win._table.horizontalHeaderItem(0).text(),
+               win.menuBar().actions()[0].text())
+        check(got == (btn, head, menu),
+              f"切到 {code} 后按钮/表头/菜单即时重译: {got}")
+        # 目标格式下拉也要跟着翻, 且选中项不变
+        check(win._fmt.itemText(0) == tr(f"tgt.{win._fmt.itemData(0)}"),
+              f"切到 {code} 后目标格式下拉已重译: {win._fmt.itemText(0)}")
+    # 行里的「识别格式」列也必须跟着切语言
+    win._switch_lang("ja")
+    pump(5)
+    ja_label = win._table.item(0, 1).text()
+    win._switch_lang("zh")
+    pump(5)
+    zh_label = win._table.item(0, 1).text()
+    win._switch_lang("en")
+    pump(5)
+    en_label = win._table.item(0, 1).text()
+    check(len({ja_label, zh_label, en_label}) == 3,
+          f"已载入行的格式列三语各异: ja={ja_label!r} zh={zh_label!r} en={en_label!r}")
+    check("Shimadzu" in en_label and "島津" in ja_label and "岛津" in zh_label,
+          f"三语 RAW 变体名都正确: {ja_label!r} / {zh_label!r} / {en_label!r}")
+    win._switch_lang("zh")
+    pump(5)
+    check(language() == "zh", f"当前语言回到 zh (实际 {language()})")
+
     win._on_clear()
     pump()
     check(win._table.rowCount() == 0, "清空列表后表格为 0 行")

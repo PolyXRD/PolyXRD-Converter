@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -648,6 +649,80 @@ def validate_roundtrip(samples: list[Path]) -> None:
                     check(False, f"往返 {sp.name[:18]} -> {key}: {e}")
 
 
+def validate_i18n() -> None:
+    """中/英/日三语文案一致性: key 集合齐平的证据全在这里。
+
+    漏 key 时 tr() 会静默回退到中文 —— 界面在日语下蹦出中文很不容易被人眼发现,
+    所以必须机器把关。占位符不对齐则更糟: 是 KeyError 级别的运行时崩。
+    """
+    print("\n=== 7) 三语文案一致性 (zh / en / ja) ===")
+    from polyxrd_converter.i18n import EN, JA, LANGS, ZH, set_language, tr
+    from polyxrd_converter.loader import FORMAT_LABELS
+    from polyxrd_converter.writers import TARGET_FORMATS
+
+    tables = {"zh": ZH, "en": EN, "ja": JA}
+    zk = set(ZH)
+    print(f"  key 总数 {len(zk)}（每种语言）")
+
+    for code, table in tables.items():
+        missing = sorted(zk - set(table))
+        extra = sorted(set(table) - zk)
+        check(not missing and not extra,
+              f"{code}: key 集合与 zh 完全一致"
+              f"（缺 {len(missing)} / 多 {len(extra)}）"
+              + (f" 缺项={missing[:6]}" if missing else "")
+              + (f" 多项={extra[:6]}" if extra else ""))
+
+    # 占位符必须三种语言同名同数量
+    def placeholders(s: str) -> tuple[str, ...]:
+        return tuple(sorted(re.findall(r"\{(\w+)\}", s)))
+
+    for k in sorted(zk):
+        pz, pe, pj = (placeholders(t[k]) for t in (ZH, EN, JA))
+        check(pz == pe == pj,
+              f"{k}: 占位符一致 {pz}" if pz == pe == pj
+              else f"{k}: 占位符不一致 zh={pz} en={pe} ja={pj}")
+        # tr(key, **kwargs) 的形参就叫 key —— 占位符再叫 {key} 会直接 TypeError
+        check("key" not in pz,
+              f"{k}: 占位符不与 tr(key=...) 撞名" if "key" not in pz
+              else f"{k}: 占位符 key 与 tr() 形参撞名 (必须改名)")
+
+    # 每张表的每个占位符都能真的 format 通 (format(**kwargs) 全填)
+    for code, table in tables.items():
+        set_language(code)
+        bad = []
+        for k in sorted(zk):
+            names = placeholders(table[k])
+            try:
+                tr(k, **{n: "X" for n in names})
+            except Exception as e:  # noqa: BLE001 - 测试要的是"任一语言都不能炸"
+                bad.append(f"{k}({e})")
+        check(not bad, f"{code}: 全部 {len(zk)} 条文案 format 不报错"
+                       + (f" 异常={bad[:5]}" if bad else ""))
+
+    # 格式名 / 目标格式名在三语下都必须有译文 —— 否则界面会退回原始 English 标签
+    set_language("zh")
+    all_fmt = set(FORMAT_LABELS) | {"rigaku_raw", "scintag_raw2", "bruker_raw_v1",
+                                    "shimadzu_raw", "raw_generic"}
+    for code in LANGS:
+        set_language(code)
+        missing = [k for k in sorted(all_fmt) if tr(f"fmt.{k}") == f"fmt.{k}"]
+        check(not missing, f"{code}: 全部 {len(all_fmt)} 个读取格式名都有译文"
+                           + (f" 缺={missing}" if missing else ""))
+        missing = [k for k, _e, _l in TARGET_FORMATS if tr(f"tgt.{k}") == f"tgt.{k}"]
+        check(not missing, f"{code}: 全部 {len(TARGET_FORMATS)} 个写出格式名都有译文"
+                           + (f" 缺={missing}" if missing else ""))
+
+    # 三种语言的按钮/菜单文案必须真的不一样 (防止整表复制粘贴没改)
+    keys = ["btn.convert", "btn.add_files", "menu.file", "status.bad_axis",
+            "dlg.about", "tip.axis_warn"]
+    for k in keys:
+        vals = {tables[c][k] for c in LANGS}
+        check(len(vals) == 3, f"{k}: 三语译文互不相同")
+
+    set_language("zh")
+
+
 def main() -> int:
     xr = Path(r"D:/Project/XRD")
     print("=" * 78)
@@ -656,6 +731,7 @@ def main() -> int:
 
     validate_fmt_pair()
     validate_gsas2_formats()
+    validate_i18n()
     validate_rigaku(xr / "XRData" / "csuHJW")
     validate_manual_axis(xr / "XRData" / "csuHJW")
     validate_raw2([xr / "XRData" / "IUCr", xr / "test_xrd" / "geshi",
