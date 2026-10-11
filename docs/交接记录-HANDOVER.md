@@ -169,7 +169,7 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 
 20. **文案占位符绝不能叫 `{key}`**：`tr(key, **kwargs)` 的第一个形参就叫 `key`，`tr("err.unsupported_target", key="xyz")` 会直接抛 `TypeError: got multiple values for argument 'key'` —— 而且只在这个冷门分支被走到时才炸，肉眼审不出来。现统一改名 `{fmt}`，并在 `validate_i18n()` 里加了「占位符不与 tr() 形参撞名」的断言；另加「三张表 key 集合齐平 + 占位符同名同数量 + 每条都能 format 通」三项守卫 —— 漏 key 时 `tr()` 会静默回退中文，日语界面蹦中文极难被人眼发现，必须机器把关。
 21. **别把展示名写死在数据声明里**：原先 `loader.FORMAT_LABELS` 和 `writers.TARGET_FORMATS` 的第三项是中文成品文案，多语言下必然漂移。现一律改成 i18n key（`fmt.*` / `tgt.*`），由 UI 在显示时用 `fmt_label()` / `tr()` 解析；Detector 返回值仍是成品文案（对外契约不变），便于日志与自检报告。
-22. **切语言要"即时生效"就得重译，不能只改全局量**：旧实现 `set_language()` 后只更新了菜单勾选态，控件文案是构造时用 `tr()` 写的，必须重启。解法是 `MainWindow._retranslate_ui()`：重建菜单栏 + 逐个 setText + 重填目标格式下拉（先存 `currentData` 再回填）+ `_refresh_table()` / `_update_preview()`。凡是 relies on 构造期 `tr()` 的 UI，加语言前先确认有没有这条路。
+22. **切语言要"即时生效"就得重译，不能只改全局量**：旧实现 `set_language()` 后只更新了菜单勾选态，控件文案是构造时用 `tr()` 写的，必须重启。解法是 `MainWindow._retranslate_ui()`：重建菜单栏 + 逐个 setText + 重填目标格式下拉（先存 `currentData` 再回填）+ `_refresh_table()` / `_update_preview()`。凡是在构造期就用 `tr()` 定死的 UI 文案，加语言前必须先确认有这条重译通路。
 23. **Release 上传资产的 URL 不能拼 `api.github.com` 前缀**：`POST /repos/.../releases` 返回的 `upload_url` 主机已是 `uploads.github.com`，再拼前缀会得到 `https://api.github.comhttps://uploads.github.com/...`，报错却是看不出根因的 `getaddrinfo failed`。脚本要支持绝对 URL；Release 已存在时应按 tag 先查、存在则复用并 PATCH 正文，避免重复创建留下空 Release。
 24. **`tasklist //FI "IMAGENAME eq xxx.exe"` 会把进程名截到 25 字符**：`PolyXRDConverter-v1.3.0.exe` 被截成 `PolyXRDConverter-v1.3.0.e`，过滤器查不到（会误判成"启动即退出"）。存活冒烟改用 `tasklist | grep -i polyxrd`，清理用 `taskkill //IM <全名> //F`。
 
