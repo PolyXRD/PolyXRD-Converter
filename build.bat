@@ -3,9 +3,9 @@ chcp 65001 >nul
 REM -- UTF-8 everywhere: 中文路径/日志不乱码
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
-title PolyXRD Converter v1.3.0 打包构建器
+title PolyXRD Converter v1.4.0 打包构建器
 echo ========================================
-echo   PolyXRD Converter v1.3.0
+echo   PolyXRD Converter v1.4.0
 echo   单文件 exe 打包 (onefile)
 echo ========================================
 echo.

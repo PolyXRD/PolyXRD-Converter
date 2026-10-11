@@ -18,9 +18,14 @@ v1.2.0: 修复 writers._fmt_pair 两列粘连 (P1, 高强度/大整数样本不�
 v1.3.0: 新增 GSAS-II 系 5 类文本格式读取器 (gsas/fp_dat/ras/xye/chi) —— 格式
 知识参考 GSAS-II 开源 importer 并按其许可注明来源, 与 GSAS-II 本体 oracle
 对拍 10 种格式逐点全等; 验证扩到 311 断言 + 冒烟 40。
+v1.4.0: 界面三语化 (简体中文 / English / 日本語) 并做到**切换即时生效** —— 原来
+写完控件后切语言要重启才生效; 新增 `_retranslate_ui()` 重译菜单/控件/清单/预览,
+格式名与目标格式名也由 key 动态翻译 (不再写死中文); 同时修掉一个真 bug: 文案占位符
+不能叫 ``{key}`` (与 ``tr(key, ...)`` 形参撞名会抛 TypeError)。验证扩到 607 断言
++ 冒烟 50。
 """
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 __author__ = "PolyXRD Team"
 __app_name__ = "PolyXRD Converter"
 
