@@ -12,7 +12,7 @@
 - **做什么**：把各种厂商/软件导出的 XRD 谱图文件互转成目标格式；**多厂商二进制 RAW 自动识别**是核心卖点。
 - **不做什么**：不做物相检索/精修/数据库（那是主项目的事）。与主项目**零耦合**，只依赖 `numpy` + `PySide6`。
 - **分发形态**：PyInstaller **单文件 exe**（约 55 MB），双击即用免安装；GitHub Release 发布 exe + SHA256。
-- **用户群**：Windows 实验室用户；界面中文/English 双语。
+- **用户群**：Windows 实验室用户；界面三语（简体中文 / English / 日本語），即时切换。
 
 ### 格式能力矩阵
 
@@ -38,7 +38,7 @@ writers.py              写出各格式（TARGET_EXTS 表驱动）
 converter.py            对 UI 只暴露 probe()（试读不落盘）与 convert_file()/convert_batch()
 ui_main.py              主窗口（文件表/批量线程/状态灯/手动轴对话框）
 ui_preview.py           手绘谱图预览（QPainter，刻意不用 matplotlib，控体积与启动速度）
-i18n.py                 中英双语字典 tr(key, **kw)
+i18n.py                 中/英/日三语字典 tr(key, **kw) + LANGS 注册表
 __init__.py             __version__ 单源（唯一版本号出处）
 ```
 
@@ -104,7 +104,7 @@ venv/Scripts/python.exe tests/smoke_gui.py          # 2) GUI 离屏冒烟 40 项
 # 5) 发版后：Release 资产回下载，SHA-256 与本地一致
 ```
 
-GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守恒/状态灯/双语切换/清空。
+GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守恒/状态灯/三语切换/清空。
 
 ---
 
@@ -116,8 +116,9 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 | v1.1.0 | 2026-10-10 | `86d27cd` | **岛津 .RAW 解析精度升级**：截断文件防护（钳点数+`truncated` 全链路透出）、截断轴强制转人工、「end 差一步长」约定精确化 | 247 断言 + 冒烟 40 + 主项目对拍 206 文件强度全等 + smz geshi 13 对逐点全等 |
 | v1.2.0 | 2026-10-10 | `4b33f48` | **P1 + P2**：修复 `writers._fmt_pair` 两列粘连（高强度/大整数样本不再塌缩成单列）；新增 θ 单轴摇摆扫描 GUI 提示 | 252 断言 + 冒烟 40 + 冻结 exe 真样本自检 10/10 全过 |
 | v1.3.0 | 2026-10-10 | `bf6707a` | **GSAS-II 系格式移植**：新增 gsas / fp_dat / ras(.rasx) / xye / chi 五类文本读取器（格式知识参考 GSAS-II 开源 importer，按其许可注明来源） | 311 断言 + 冒烟 40 + 冻结 exe 自检 10/10；另与 GSAS-II 本体 oracle 对拍 |
+| v1.4.0 | 2026-10-12 | 见下 | **界面三语化 + 即时切换**：新增日本語；原来切语言只改全局量、控件要重启才更新，现由 `_retranslate_ui()` 重译菜单/控件/清单/预览；格式名与目标格式名改由 key 动态翻译；读取层 30 条报错全部入表 | 607 断言（含三语一致性专项）+ 冒烟 50 + 冻结 exe 自检 10/10 |
 
-**发布状态**：v1.3.0 已推送 GitHub 并发布 Release（exe + SHA256，哈希回下载闭环一致）。工作树干净（仅 `.workbuddy/` 未跟踪），无未推送提交，无遗留任务。
+**发布状态**：v1.4.0 已推送 GitHub 并发布 Release（exe + SHA256，哈希回下载闭环一致）。工作树干净（仅 `.workbuddy/` 未跟踪），无未推送提交，无遗留任务。
 
 **GSAS-II oracle 对拍**（v1.3.0 一次性验证，结论沉淀在此）：用 `C:/gsas2main/python.exe` + `sys.path` 指其 `GSAS-II` 目录可调 GSAS-II 的 importer 当参考实现；14 个合成样本中 **10 个与 GSAS-II 逐点全等（dx=dy=0）**，4 个 SKIP 均为 GSAS-II 自身缺陷（见 §6.4）。
 
@@ -158,6 +159,14 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 18. **`/* */` 单行注释的 got_c 置位缺陷**：GSAS-II 的 FP reader/validator 遇单行 `/* … */` 会把块注释态永久置位、吞掉后续所有行；本实现检测 `*/` 是否同行再决定是否进入块注释态。
 19. **`.dat` 四义判定顺序**（detect_format）：Jade 两行头 → GSAS BANK → FullProf 头（需全量数据做 `start+step*(n-1)≈stop` 自洽校验，4KB 头嗅探不够）→ 普通两列文本。自写两列 `.dat` 的往返守恒是回归基线（FP 误判守卫）。
 
+### 6.5 三语化与发布侧（v1.4.0，§6 只增不删）
+
+20. **文案占位符绝不能叫 `{key}`**：`tr(key, **kwargs)` 的第一个形参就叫 `key`，`tr("err.unsupported_target", key="xyz")` 会直接抛 `TypeError: got multiple values for argument 'key'` —— 而且只在这个冷门分支被走到时才炸，肉眼审不出来。现统一改名 `{fmt}`，并在 `validate_i18n()` 里加了「占位符不与 tr() 形参撞名」的断言；另加「三张表 key 集合齐平 + 占位符同名同数量 + 每条都能 format 通」三项守卫 —— 漏 key 时 `tr()` 会静默回退中文，日语界面蹦中文极难被人眼发现，必须机器把关。
+21. **别把展示名写死在数据声明里**：原先 `loader.FORMAT_LABELS` 和 `writers.TARGET_FORMATS` 的第三项是中文成品文案，多语言下必然漂移。现一律改成 i18n key（`fmt.*` / `tgt.*`），由 UI 在显示时用 `fmt_label()` / `tr()` 解析；Detector 返回值仍是成品文案（对外契约不变），便于日志与自检报告。
+22. **切语言要"即时生效"就得重译，不能只改全局量**：旧实现 `set_language()` 后只更新了菜单勾选态，控件文案是构造时用 `tr()` 写的，必须重启。解法是 `MainWindow._retranslate_ui()`：重建菜单栏 + 逐个 setText + 重填目标格式下拉（先存 `currentData` 再回填）+ `_refresh_table()` / `_update_preview()`。凡是 relies on 构造期 `tr()` 的 UI，加语言前先确认有没有这条路。
+23. **Release 上传资产的 URL 不能拼 `api.github.com` 前缀**：`POST /repos/.../releases` 返回的 `upload_url` 主机已是 `uploads.github.com`，再拼前缀会得到 `https://api.github.comhttps://uploads.github.com/...`，报错却是看不出根因的 `getaddrinfo failed`。脚本要支持绝对 URL；Release 已存在时应按 tag 先查、存在则复用并 PATCH 正文，避免重复创建留下空 Release。
+24. **`tasklist //FI "IMAGENAME eq xxx.exe"` 会把进程名截到 25 字符**：`PolyXRDConverter-v1.3.0.exe` 被截成 `PolyXRDConverter-v1.3.0.e`，过滤器查不到（会误判成"启动即退出"）。存活冒烟改用 `tasklist | grep -i polyxrd`，清理用 `taskkill //IM <全名> //F`。
+
 ---
 
 ## 7. 已知问题与下一步计划
@@ -165,7 +174,7 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 | 优先级 | 事项 | 说明 |
 |---|---|---|
 | ~~**P1**~~ ✅ 已解决 (2026-10-10) | `writers._fmt_pair` 两列粘连修复 | 照搬主项目 `b0fdec7` 思路：仅当 y 字段首字符非空格（占满 10 字符场宽，如 `126727.648` 或 10 位整数）时补一个显式分隔空格；正常样本保持与原厂字节一致。新增 P1 回归 5 项（`tests/validate_samples.py::validate_fmt_pair`）；`validate` 252/252、冒烟 40/40 全绿 |
-| ~~P2~~ ✅ 已解决 (2026-10-10) | θ 单轴扫描的用户提示 | 二进制无法自动判别；已在 `i18n.tip.rocking_scan`（中/英）新增文案，并透出到手动定轴对话框、坏轴状态 tooltip、坏轴预览说明三处轴提示 |
+| ~~P2~~ ✅ 已解决 (2026-10-10) | θ 单轴扫描的用户提示 | 二进制无法自动判别；已在 `i18n.tip.rocking_scan`（中/英/日）新增文案，并透出到手动定轴对话框、坏轴状态 tooltip、坏轴预览说明三处轴提示 |
 | ~~P3~~ ◐ 部分完成 (2026-10-10) | 新厂商格式 | **GSAS-II 系文本格式已入**（gsas/fp_dat/ras/xye/chi，含 GSAS-II oracle 对拍）；Bruker RAW v2/v3、理学 RAS 二进制等仍按用户样本再逆向；流程见 §3/§4 |
 | P4 | 发版流程脚本化 | 把 §4.3 流水线 + Release 脚本（幂等：tag 已存在跳过、资产 sha256 比对）固化为 tools/release.py |
 

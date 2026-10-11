@@ -11,7 +11,7 @@
 - **批量转换**：拖入整个目录，后台线程逐个转换，实时进度
 - **谱图预览**：手绘曲线（不依赖 matplotlib），滚轮缩放 / 拖拽平移 / 双击复位 / 最强峰标记
 - **角度轴护栏**：RAW 头参数损坏时**宁可标记不可信也不硬猜**——拒绝自动转换并引导人工指定 `(起始 2θ, 步长)`，杜绝产出峰位错误的谱图
-- **双语界面**：中文 / English
+- **三语界面**：简体中文 / English / 日本語，菜单栏「语言」切换**即时生效**（无需重启）；语言名为母语写法，加新语言只需在 `i18n.py` 加一张表
 
 ## RAW 多厂商自动识别
 
@@ -67,8 +67,8 @@ convert_file("spectrum.raw", "spectrum.xrdml")   # 单文件转换
 真实样本全量交叉校验（与同谱其它格式导出逐点比对）：
 
 ```
-python tests/validate_samples.py     # 311 项断言
-python tests/smoke_gui.py            # GUI 离屏冒烟 40 项
+python tests/validate_samples.py     # 607 项断言
+python tests/smoke_gui.py            # GUI 离屏冒烟 50 项
 ```
 
 覆盖：
@@ -80,6 +80,7 @@ python tests/smoke_gui.py            # GUI 离屏冒烟 40 项
 - **Jade**：文本导出按头建轴 + 峰位交叉
 - **GSAS-II 系文本格式**：`.gsas/.fxye`（FXYE/FXY/ESD/STD）、FullProf `.dat`、Rigaku `.ras/.rasx`、Topas `.xye/.qye`、Fit2D `.chi/.qchi` 合成样本全格式回归，并以 GSAS-II 本体（Argonne 开源参考实现）做 oracle 逐点对拍 —— 10 种格式与 GSAS-II 完全一致，4 项跳过均为 GSAS-II 自身缺陷（STD `int()` 崩溃、Fit2D 头误入 pyFAI 分支等），本实现均规避
 - 8 种格式往返守恒
+- **三语一致性（v1.4.0）**：139 条文案 × 3 语言的 key 集合齐平、占位符同名同数量、每条都能 `format` 通过；读取/写出格式名在三种语言下均有译文；抽取按钮/菜单/「关于」等 6 条做「三语互不相同」守卫（防整表复制没改）。另有 3 项针对 UI 的冒烟断言：切到 ja/en/zh 后按钮、表头、菜单栏、目标格式下拉、已载入行的「识别格式」列全部即时重译
 
 ## 开发
 
