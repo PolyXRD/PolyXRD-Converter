@@ -50,7 +50,7 @@ if %errorlevel% neq 0 (
     pause
     exit /b 1
 )
-if not exist "dist\PolyXRDConverter.exe" (
+if not exist "dist\PolyXRD-Converter.exe" (
     echo [错误] EXE 未生成, 构建失败!
     pause
     exit /b 1
@@ -58,17 +58,25 @@ if not exist "dist\PolyXRDConverter.exe" (
 
 echo.
 echo [步骤 3/3] 产物校验 (大小 + SHA-256)...
-for %%A in ("dist\PolyXRDConverter.exe") do echo   大小:     %%~zA 字节
-"%PYTHON%" -c "import hashlib,sys; p=sys.argv[1]; h=hashlib.sha256(open(p,'rb').read()).hexdigest(); print('  SHA-256: '+h)" "dist\PolyXRDConverter.exe"
+for %%A in ("dist\PolyXRD-Converter.exe") do echo   大小:     %%~zA 字节
+"%PYTHON%" -c "import hashlib,sys; p=sys.argv[1]; h=hashlib.sha256(open(p,'rb').read()).hexdigest(); print('  SHA-256: '+h)" "dist\PolyXRD-Converter.exe"
+
+echo.
+echo [步骤 3b] 复制为带版本号快照 + 写 SHA-256 校验文件...
+copy /Y "dist\PolyXRD-Converter.exe" "dist\PolyXRD-Converter-v%APPVER%.exe" >nul
+"%PYTHON%" -c "import hashlib,sys; p=sys.argv[1]; t=sys.argv[2]; n=sys.argv[3]; h=hashlib.sha256(open(p,'rb').read()).hexdigest(); open(t,'w').write(h+'  '+n+'\n'); print('  已写: '+t)" "dist\PolyXRD-Converter-v%APPVER%.exe" "dist\SHA256-v%APPVER%.txt" "PolyXRD-Converter-v%APPVER%.exe"
 
 echo.
 echo ========================================
 echo   PolyXRD Converter v%APPVER% 打包完成!
 echo ========================================
 echo.
-echo 产物: dist\PolyXRDConverter.exe
+echo 产物:
+echo   dist\PolyXRD-Converter.exe            (最新版 / 无版本号, 始终为刚构建的)
+echo   dist\PolyXRD-Converter-v%APPVER%.exe   (带版本号快照)
+echo   dist\SHA256-v%APPVER%.txt             (校验和, 文件名含连字符)
 echo.
-echo 请双击 dist\PolyXRDConverter.exe 做人工冒烟验收:
+echo 请双击 dist\PolyXRD-Converter.exe 做人工冒烟验收:
 echo   1. 拖入 .raw / .txt / .mdi / .xrdml 各一个
 echo   2. 确认表格识别格式正确、预览出图
 echo   3. 转成 .xy 与 .xrdml, 用 PolyXRD 主体回读核对
