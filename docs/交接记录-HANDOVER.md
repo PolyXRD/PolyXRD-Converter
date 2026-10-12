@@ -103,7 +103,7 @@ __init__.py             __version__ 单源（唯一版本号出处）
 venv/Scripts/python.exe tests/validate_samples.py   # 1) 全量断言（需 XRData 在位）
 venv/Scripts/python.exe tests/smoke_gui.py          # 2) GUI 离屏冒烟 50 项
 # 3) 冻结 exe（构建后）：--selftest 真样本 --report out.txt，exit 0 + RESULT ok=N
-./dist/PolyXRDConverter.exe --selftest "样本A" "样本B" --report selftest_report.txt
+./dist/PolyXRD-Converter.exe --selftest "样本A" "样本B" --report selftest_report.txt
 # 4) GUI 存活冒烟：启动 exe → 12s 后 tasklist 有进程 → taskkill
 # 5) 发版后：Release 资产回下载，SHA-256 与本地一致
 ```
@@ -171,7 +171,7 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 21. **别把展示名写死在数据声明里**：原先 `loader.FORMAT_LABELS` 和 `writers.TARGET_FORMATS` 的第三项是中文成品文案，多语言下必然漂移。现一律改成 i18n key（`fmt.*` / `tgt.*`），由 UI 在显示时用 `fmt_label()` / `tr()` 解析；Detector 返回值仍是成品文案（对外契约不变），便于日志与自检报告。
 22. **切语言要"即时生效"就得重译，不能只改全局量**：旧实现 `set_language()` 后只更新了菜单勾选态，控件文案是构造时用 `tr()` 写的，必须重启。解法是 `MainWindow._retranslate_ui()`：重建菜单栏 + 逐个 setText + 重填目标格式下拉（先存 `currentData` 再回填）+ `_refresh_table()` / `_update_preview()`。凡是在构造期就用 `tr()` 定死的 UI 文案，加语言前必须先确认有这条重译通路。
 23. **Release 上传资产的 URL 不能拼 `api.github.com` 前缀**：`POST /repos/.../releases` 返回的 `upload_url` 主机已是 `uploads.github.com`，再拼前缀会得到 `https://api.github.comhttps://uploads.github.com/...`，报错却是看不出根因的 `getaddrinfo failed`。脚本要支持绝对 URL；Release 已存在时应按 tag 先查、存在则复用并 PATCH 正文，避免重复创建留下空 Release。
-24. **`tasklist //FI "IMAGENAME eq xxx.exe"` 会把进程名截到 25 字符**：`PolyXRDConverter-v1.3.0.exe` 被截成 `PolyXRDConverter-v1.3.0.e`，过滤器查不到（会误判成"启动即退出"）。存活冒烟改用 `tasklist | grep -i polyxrd`，清理用 `taskkill //IM <全名> //F`。
+24. **`tasklist //FI "IMAGENAME eq xxx.exe"` 会把进程名截到 25 字符**：v1.3.0 时 `PolyXRDConverter-v1.3.0.exe` 被截成 `PolyXRDConverter-v1.3.0.e`，过滤器查不到（会误判成"启动即退出"）。现命名用连字符（`PolyXRD-Converter-vX.Y.Z.exe`，仍约 27 字符）截断仍可能发生，存活冒烟改用 `tasklist | grep -i polyxrd`，清理用 `taskkill //IM <全名> //F`（务必用全名，别靠截断后的过滤器）。
 
 ---
 
@@ -193,7 +193,7 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 - **许可口径（别写错）**：本项目是**双许可**（学术研究/教学免费，商业用途须单独书面授权），**不是 MIT**。v1.3.0 / v1.4.0 的 Release 正文曾误写成 "MIT（见 LICENSE）"，2026-10-12 已纠正；写 Release/文档时照抄 `README.md` 的「许可」一节最稳。GSAS-II 系读取器另有上游署名要求（UChicago Argonne, LLC）。。
 - **本地路径**：项目 `D:/Project/XRD/PolyXRD-Converter`；真机样本 `D:/Project/XRD/XRData`、`D:/Project/XRD/test_xrd`；主项目 `D:/Project/XRD/PolyXRD`（其 venv 可用于跨项目对拍，numpy 兼容）。
 - **环境**：项目自带 `venv/`（Python 3.10.11，numpy + PySide6 + pyinstaller）；Git Bash 为主 shell；Python 一律 `venv/Scripts/python.exe`。
-- **构建**：`build.bat`（或分步）→ `dist/PolyXRDConverter.exe`；版本号单源 `src/polyxrd_converter/__init__.py`，build.bat 动态读取。
+- **构建**：`build.bat`（或分步）→ `dist/PolyXRD-Converter.exe`（最新版，无版本号）+ `dist/PolyXRD-Converter-vX.Y.Z.exe`（带版本号快照）+ `dist/SHA256-vX.Y.Z.txt`；版本号单源 `src/polyxrd_converter/__init__.py`，build.bat 动态读取。
 - **常用命令**：见 §4.3。VERBOSE=1 可看逐条断言。
 - **协作红线**：commit/push 需用户批准；commit 信息"更新代码修正：…"、不含竞品字样；push 后 `git ls-remote` 校验 HEAD；文档变更先审阅再入库。
 - **本文档维护**：随版本更新"当前进展"与"已知问题"两节即可，§6 踩坑只增不删。

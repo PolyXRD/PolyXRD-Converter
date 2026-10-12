@@ -39,7 +39,7 @@
 
 ### 图形界面
 
-双击 `PolyXRDConverter.exe`（或 `python main.py`）：
+双击 `PolyXRD-Converter.exe`（或 `python main.py`）：
 
 1. 把文件/文件夹拖进窗口（或点「添加文件」）
 2. 表格自动识别每个文件的格式、点数、2θ 范围、最强峰强度
@@ -50,7 +50,7 @@
 带参启动（拖文件到 exe 图标上等效）：
 
 ```
-PolyXRDConverter.exe D:\data\spectrum.raw D:\data\another.xy
+PolyXRD-Converter.exe D:\data\spectrum.raw D:\data\another.xy
 ```
 
 ### 命令行 / 作为库
