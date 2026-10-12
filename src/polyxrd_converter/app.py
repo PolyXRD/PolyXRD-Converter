@@ -62,7 +62,7 @@ def _excepthook(exc_type, exc, tb) -> None:
 def _selftest(argv: list[str]) -> int:
     """无界面自检 (给冻结 exe 用, console=False 时 stdout 不可见, 走报告文件)。
 
-    用法: ``PolyXRDConverter.exe --selftest a.raw b.txt --report out.txt``
+    用法: ``PolyXRD-Converter.exe --selftest a.raw b.txt --report out.txt``
     对每个给定文件做 探测 → 转换 (xrdml) → 回读 点数守恒 检查;
     轴不可信的文件期望被拒。退出码: 0 = 全过, 1 = 有失败。
     """
