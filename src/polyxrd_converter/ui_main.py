@@ -46,6 +46,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSplitter,
     QTableWidget,
+    QTextBrowser,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
@@ -76,6 +77,46 @@ _SCAN_EXTS = {".raw", ".xy", ".txt", ".dat", ".csv", ".mdi", ".xrdml", ".xml",
               # 岛津 Shimadzu 私有容器的伴随扩展名 (与 .RAW 同结构, 均为扫描谱):
               # .org 原始 / .rsm 平滑 / .rbg 背底 / .rk1 Kα1 剥离 / .rlz / .rax / .rfi
               ".org", ".rsm", ".rbg", ".rk1", ".rlz", ".rax", ".rfi"}
+
+
+# 版权对话框正文: 双语 (中 / 英) 许可与联系方式, 固定内容不走 i18n
+# (若经 tr() 翻译会被当成「按界面语言译」, 而本页本就要中英并列, 故用常量)。
+_COPYRIGHT_HTML = """<style>
+  body { font-family: "Microsoft YaHei", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif; font-size: 13px; line-height: 1.6; }
+  h3 { margin: 10px 0 4px; color: #1f2d3d; }
+  ul { margin: 2px 0 6px; padding-left: 20px; }
+  .en { color: #5b6b7f; }
+  a { color: #0a66c2; }
+  code { background: #eef1f5; padding: 0 4px; border-radius: 3px; }
+</style>
+<h3>版权 / Copyright</h3>
+<p><b>PolyXRD Converter</b> · 版权所有 (c) 2025 — 2026 PolyXRD Team. 保留所有权利。<br>
+<span class="en">Copyright (c) 2025 — 2026 PolyXRD Team. All rights reserved.</span></p>
+
+<h3>许可条款 / License Terms</h3>
+<p>本软件可按以下条款使用：</p>
+<ul>
+  <li>学术研究与教学：免费使用。</li>
+  <li>商业用途：须经版权持有人单独书面授权。</li>
+</ul>
+<p class="en">Free to use under the following terms:</p>
+<ul>
+  <li class="en">Academic research and teaching: free of charge.</li>
+  <li class="en">Commercial use: requires prior written authorization from the copyright holder.</li>
+</ul>
+
+<h3>免责声明 / Disclaimer</h3>
+<p>本软件按“原样”提供，不提供任何明示或暗示的担保，包括但不限于对适销性、特定用途适用性的担保。</p>
+<p class="en">This software is provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability and fitness for a particular purpose.</p>
+
+<h3>第三方组件 / Third-party</h3>
+<p>PySide6 (LGPL/GPL)、numpy (BSD) 等；使用本软件即表示同意遵守其各自许可。完整法律条款见仓库 <code>LICENSE</code>（英文）与 <code>LICENSE-CN</code>（中文）。</p>
+<p class="en">PySide6 (LGPL/GPL), numpy (BSD), etc. Use of this software constitutes acceptance of their respective licenses. Full terms: see <code>LICENSE</code> (English) and <code>LICENSE-CN</code> (Chinese) in the repository.</p>
+
+<h3>联系方式 / Contact</h3>
+<p>邮箱 / Email: <a href="mailto:sshztx@outlook.com">sshztx@outlook.com</a><br>
+项目 / Project: <a href="https://github.com/PolyXRD">github.com/PolyXRD</a></p>
+"""
 
 
 @dataclass
@@ -157,6 +198,28 @@ class AxisDialog(QDialog):
 
     def values(self) -> tuple[float, float]:
         return float(self._start.value()), float(self._step.value())
+
+
+# ----------------------------------------------------------------------
+# 版权对话框 (帮助菜单)
+# ----------------------------------------------------------------------
+
+class CopyrightDialog(QDialog):
+    """帮助菜单「版权」: 弹出双语 (中 / 英) 许可与联系方式。正文固定, 不随界面语言变化。"""
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(tr("menu.help.copyright") + "  /  Copyright")
+        self.setMinimumSize(580, 460)
+        root = QVBoxLayout(self)
+        browser = QTextBrowser()
+        browser.setOpenExternalLinks(True)
+        browser.setReadOnly(True)
+        browser.setHtml(_COPYRIGHT_HTML)
+        root.addWidget(browser)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        root.addWidget(buttons)
 
 
 # ----------------------------------------------------------------------
@@ -380,7 +443,10 @@ class MainWindow(QMainWindow):
         mh = bar.addMenu(tr("menu.help"))
         ab = QAction(tr("menu.help.about"), self)
         ab.triggered.connect(self._on_about)
+        cp = QAction(tr("menu.help.copyright"), self)
+        cp.triggered.connect(self._on_copyright)
         mh.addAction(ab)
+        mh.addAction(cp)
 
     def _switch_lang(self, lang: str) -> None:
         """切换界面语言: 菜单/控件/清单/预览全部即时重译, 无需重启。"""
@@ -764,3 +830,6 @@ class MainWindow(QMainWindow):
 
     def _on_about(self) -> None:
         QMessageBox.about(self, tr("menu.help.about"), tr("dlg.about", version=__version__))
+
+    def _on_copyright(self) -> None:
+        CopyrightDialog(self).exec()

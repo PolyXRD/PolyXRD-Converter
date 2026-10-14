@@ -31,6 +31,7 @@ ZH: dict[str, str] = {
     "menu.lang": "语言(&L)",
     "menu.help": "帮助(&H)",
     "menu.help.about": "关于",
+    "menu.help.copyright": "版权",
 
     "lang.zh": "简体中文",
     "lang.en": "English",
@@ -240,6 +241,7 @@ EN: dict[str, str] = {
     "menu.lang": "&Language",
     "menu.help": "&Help",
     "menu.help.about": "About",
+    "menu.help.copyright": "Copyright",
 
     "lang.zh": "简体中文",
     "lang.en": "English",
@@ -460,6 +462,7 @@ JA: dict[str, str] = {
     "menu.lang": "言語(&L)",
     "menu.help": "ヘルプ(&H)",
     "menu.help.about": "バージョン情報",
+    "menu.help.copyright": "著作権",
 
     "lang.zh": "简体中文",
     "lang.en": "English",

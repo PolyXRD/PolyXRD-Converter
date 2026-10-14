@@ -23,9 +23,12 @@ v1.4.0: 界面三语化 (简体中文 / English / 日本語) 并做到**切换�
 格式名与目标格式名也由 key 动态翻译 (不再写死中文); 同时修掉一个真 bug: 文案占位符
 不能叫 ``{key}`` (与 ``tr(key, ...)`` 形参撞名会抛 TypeError)。验证扩到 607 断言
 + 冒烟 50。
+v1.4.1: 帮助菜单新增「版权」项 (与「关于」并列), 弹出双语 (中 / 英) 版权与许可说明
++ 联系方式; 构建产物文件名约定统一为连字符 (PolyXRD-Converter-vX.Y.Z.exe /
+最新版 PolyXRD-Converter.exe), 取代早期的无空格连写命名。
 """
 
-__version__ = "1.4.0"
+__version__ = "1.4.1"
 __author__ = "PolyXRD Team"
 __app_name__ = "PolyXRD Converter"
 
