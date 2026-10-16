@@ -14,6 +14,7 @@ import tempfile
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("POLYXRD_REG_NO_PROMPT", "1")  # 注册模块冒烟保护 (双保险)
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -264,6 +265,60 @@ def main() -> int:
     check(win._btn_convert.isEnabled() is False, "清空后转换按钮回到禁用")
 
     win.close()
+
+    # --- 7) 注册机制 (Setup 版有 / 内部评估版无) ---
+    print("\n=== 7) 注册机制 (状态栏右下 / 帮助菜单 / 注册流程) ===")
+    import polyxrd_converter.ui_main as _um
+    from polyxrd_converter import registration as _reg
+
+    if _um.registration is not None:
+        # 7a) Setup 版主窗口: 未注册标签 + 帮助菜单含「输入注册码」
+        check(win._reg is not None, "Setup 版主窗口持有 RegistrationManager")
+        check(win._reg_label.text() == "未注册",
+              f"未注册时状态栏右下 = {win._reg_label.text()!r}")
+        help_acts = [a.text() for a in win.menuBar().actions()[-1].menu().actions()]
+        check(len(help_acts) == 3 and any("输入注册码" in t for t in help_acts),
+              f"帮助菜单 3 项含输入注册码: {help_acts}")
+        # 7b) 完整注册流程 (临时状态文件, 不污染真实 %APPDATA%)
+        tmp = Path(tempfile.mkdtemp()) / "registration.json"
+        win._reg.state_path = tmp
+        code = _reg.generate_code("清华大学材料学院")
+        state = _reg.save_state(tmp, code)
+        check(state.registered and state.unit == "清华大学材料学院",
+              f"save_state 出码-验码闭环: {state.unit!r}")
+        win._reg.refresh()
+        check("清华大学材料学院" in win._reg_label.text(),
+              f"注册后状态栏右下 = {win._reg_label.text()!r}")
+        # 7c) 标签三语即时重译
+        for lang, expect_lab in (("en", "Registered: 清华大学材料学院"),
+                                 ("ja", "登録済み: 清华大学材料学院"),
+                                 ("zh", "已注册：清华大学材料学院")):
+            win._switch_lang(lang)
+            pump(5)
+            check(win._reg_label.text() == expect_lab,
+                  f"{lang}: 注册标签重译 = {win._reg_label.text()!r}")
+        win._switch_lang("zh")
+        # 7d) 篡改 JSON 伪造注册 -> 启动时重新校验会打回未注册
+        tmp.write_text('{"code": "FAKE", "unit": "清华大学材料学院"}', encoding="utf-8")
+        check(not _reg.load_state(tmp).registered, "手改 JSON 伪造注册无效")
+        win.close()
+    else:
+        check(False, "源码环境应含注册模块 (Setup 版); 若有意跑内部版测试请检查")
+
+    # 7e) 内部评估版: registration=None -> 状态栏「内部评估版本」+ 无注册菜单
+    saved = _um.registration
+    _um.registration = None
+    try:
+        win_int = MainWindow()
+        check(win_int._reg is None, "内部评估版不创建 RegistrationManager")
+        check(win_int._reg_label.text() == tr("statusbar.internal"),
+              f"内部评估版状态栏右下 = {win_int._reg_label.text()!r}")
+        help_acts_i = [a.text() for a in win_int.menuBar().actions()[-1].menu().actions()]
+        check(len(help_acts_i) == 2 and not any("注册" in t for t in help_acts_i),
+              f"内部评估版帮助菜单 2 项无注册项: {help_acts_i}")
+        win_int.close()
+    finally:
+        _um.registration = saved
 
     print("\n" + "=" * 78)
     print(f"通过 {len(OK)}  /  失败 {len(FAIL)}")

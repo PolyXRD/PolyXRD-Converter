@@ -715,7 +715,7 @@ def validate_i18n() -> None:
 
     # 三种语言的按钮/菜单文案必须真的不一样 (防止整表复制粘贴没改)
     keys = ["btn.convert", "btn.add_files", "menu.file", "status.bad_axis",
-            "dlg.about", "tip.axis_warn"]
+            "dlg.about", "tip.axis_warn", "statusbar.internal"]
     for k in keys:
         vals = {tables[c][k] for c in LANGS}
         check(len(vals) == 3, f"{k}: 三语译文互不相同")
