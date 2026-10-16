@@ -1,10 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PolyXRD Converter —— PyInstaller 单文件打包
+# PolyXRD Converter —— 内部评估版 (onefile 单文件, 不含注册机制)
 #
-# 交付形态: 单文件 exe (onefile), 双击即用, 无需安装。
-# 与主体 PolyXRD 不同: 本工具零数据库、零 scipy/matplotlib,
-# 靠 PyInstaller 内置的 PySide6/numpy hook 即可, 不用 collect_all
-# (避免把 WebEngine 等未用组件拖进来, exe 体积差 3 倍)。
+# 与 PolyXRDConverter-Setup.spec 的唯一差别:
+#   * excludes 剔除 polyxrd_converter.registration
+#     -> 运行时 ui_main 里 import 失败, registration=None,
+#        无启动提示 / 无「输入注册码」菜单, 状态栏右侧显示「内部评估版本」。
+#   * exe 名 PolyXRD-Converter-Internal。
+# 交付形态: 单文件 exe (onefile), 双击即用, 供内部自用。
 
 datas = [
     ('src/polyxrd_converter/resources', 'polyxrd_converter/resources'),
@@ -28,6 +30,8 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
+        # 注册模块: 内部评估版不带 (ui_main 以 try/except ImportError 兜底)
+        'polyxrd_converter.registration',
         # 明确排除用不到的大件, 控制单文件体积
         'matplotlib', 'scipy', 'pandas', 'PySide6.QtWebEngineCore',
         'PySide6.QtWebEngineWidgets', 'PySide6.QtQml', 'PySide6.QtQuick',
@@ -44,7 +48,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='PolyXRD-Converter',
+    name='PolyXRD-Converter-Internal',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -3,11 +3,12 @@ chcp 65001 >nul
 REM -- UTF-8 everywhere: 中文路径/日志不乱码
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
-title PolyXRD Converter v1.4.0 打包构建器
-echo ========================================
-echo   PolyXRD Converter v1.4.0
-echo   单文件 exe 打包 (onefile)
-echo ========================================
+title PolyXRD Converter v1.5.0 双形态打包构建器
+echo ==============================================
+echo   PolyXRD Converter - 双形态构建
+echo   1. Internal 单文件 exe (无注册机制)
+echo   2. Setup 安装包 (含注册机制, Inno Setup)
+echo ==============================================
 echo.
 
 cd /d "%~dp0"
@@ -33,52 +34,95 @@ if %errorlevel% neq 0 (
     "%PIP%" install pyinstaller^>=6.0
 )
 
+REM ── Inno Setup 定位 ──────────────────────────────────
+set ISCC=C:\Program Files (x86)\Inno Setup 6\ISCC.exe
+if not exist "%ISCC%" set ISCC=C:\Program Files\Inno Setup 6\ISCC.exe
+if not exist "%ISCC%" (
+    echo [错误] 未找到 Inno Setup 6 (ISCC.exe), 无法构建 Setup 安装包!
+    pause
+    exit /b 1
+)
+echo [信息] 使用 Inno Setup: %ISCC%
+
 echo.
-echo [步骤 1/3] 生成应用图标...
+echo [步骤 1/6] 生成应用图标...
 "%PYTHON%" build_icon.py
 if %errorlevel% neq 0 (
     echo [警告] 图标生成失败, 使用已有 icon.ico 继续
 )
 
 echo.
-echo [步骤 2/3] PyInstaller 单文件打包...
-if exist "build" rmdir /s /q "build"
-if exist "dist" rmdir /s /q "dist"
-"%PYTHON%" -m PyInstaller PolyXRDConverter.spec --noconfirm
+echo [步骤 2/6] 构建 Internal 单文件版 (无注册机制)...
+"%PYTHON%" -m PyInstaller PolyXRDConverter-Internal.spec --noconfirm
 if %errorlevel% neq 0 (
-    echo [错误] PyInstaller 打包失败!
+    echo [错误] Internal 版打包失败!
     pause
     exit /b 1
 )
-if not exist "dist\PolyXRD-Converter.exe" (
-    echo [错误] EXE 未生成, 构建失败!
+if not exist "dist\PolyXRD-Converter-Internal.exe" (
+    echo [错误] Internal EXE 未生成, 构建失败!
     pause
     exit /b 1
 )
 
 echo.
-echo [步骤 3/3] 产物校验 (大小 + SHA-256)...
-for %%A in ("dist\PolyXRD-Converter.exe") do echo   大小:     %%~zA 字节
-"%PYTHON%" -c "import hashlib,sys; p=sys.argv[1]; h=hashlib.sha256(open(p,'rb').read()).hexdigest(); print('  SHA-256: '+h)" "dist\PolyXRD-Converter.exe"
+echo [步骤 3/6] 构建 Setup 版 onedir (含注册机制)...
+"%PYTHON%" -m PyInstaller PolyXRDConverter-Setup.spec --noconfirm
+if %errorlevel% neq 0 (
+    echo [错误] Setup 版打包失败!
+    pause
+    exit /b 1
+)
+if not exist "dist\PolyXRD-Converter-Setup\PolyXRD-Converter-Setup.exe" (
+    echo [错误] Setup 版主程序未生成, 构建失败!
+    pause
+    exit /b 1
+)
 
 echo.
-echo [步骤 3b] 复制为带版本号快照 + 写 SHA-256 校验文件...
-copy /Y "dist\PolyXRD-Converter.exe" "dist\PolyXRD-Converter-v%APPVER%.exe" >nul
-"%PYTHON%" -c "import hashlib,sys; p=sys.argv[1]; t=sys.argv[2]; n=sys.argv[3]; h=hashlib.sha256(open(p,'rb').read()).hexdigest(); open(t,'w').write(h+'  '+n+'\n'); print('  已写: '+t)" "dist\PolyXRD-Converter-v%APPVER%.exe" "dist\SHA256-v%APPVER%.txt" "PolyXRD-Converter-v%APPVER%.exe"
+echo [步骤 4/6] Inno Setup 编译安装包...
+"%ISCC%" /DAPP_VERSION=%APPVER% installer\PolyXRD-Converter.iss
+if %errorlevel% neq 0 (
+    echo [错误] Inno Setup 编译失败!
+    pause
+    exit /b 1
+)
+if not exist "dist\PolyXRD-Converter-Setup-v%APPVER%.exe" (
+    echo [错误] 安装包未生成, 构建失败!
+    pause
+    exit /b 1
+)
 
 echo.
-echo ========================================
-echo   PolyXRD Converter v%APPVER% 打包完成!
-echo ========================================
+echo [步骤 5/6] 复制带版本号快照...
+copy /Y "dist\PolyXRD-Converter-Internal.exe" "dist\PolyXRD-Converter-Internal-v%APPVER%.exe" >nul
+
+echo.
+echo [步骤 6/6] 写 SHA-256 校验文件 (两个产物合并一份)...
+"%PYTHON%" make_sha256.py "dist\PolyXRD-Converter-Internal-v%APPVER%.exe" "dist\PolyXRD-Converter-Setup-v%APPVER%.exe" "dist\SHA256-v%APPVER%.txt"
+if %errorlevel% neq 0 (
+    echo [错误] SHA-256 校验文件写入失败!
+    pause
+    exit /b 1
+)
+
+echo.
+echo ==============================================
+echo   PolyXRD Converter v%APPVER% 构建完成!
+echo ==============================================
 echo.
 echo 产物:
-echo   dist\PolyXRD-Converter.exe            (最新版 / 无版本号, 始终为刚构建的)
-echo   dist\PolyXRD-Converter-v%APPVER%.exe   (带版本号快照)
-echo   dist\SHA256-v%APPVER%.txt             (校验和, 文件名含连字符)
+echo   dist\PolyXRD-Converter-Internal.exe                  (内部评估版, 最新, 无版本号)
+echo   dist\PolyXRD-Converter-Internal-v%APPVER%.exe        (内部评估版, 带版本号)
+echo   dist\PolyXRD-Converter-Setup-v%APPVER%.exe           (Setup 安装包, 含注册机制)
+echo   dist\SHA256-v%APPVER%.txt                            (两产物合并校验和)
 echo.
-echo 请双击 dist\PolyXRD-Converter.exe 做人工冒烟验收:
-echo   1. 拖入 .raw / .txt / .mdi / .xrdml 各一个
-echo   2. 确认表格识别格式正确、预览出图
-echo   3. 转成 .xy 与 .xrdml, 用 PolyXRD 主体回读核对
+echo 人工冒烟验收建议:
+echo   1. 双击 dist\PolyXRD-Converter-Internal.exe: 状态栏右下应显示「内部评估版本」,
+echo      帮助菜单只有 关于/版权 两项, 无启动提示;
+echo   2. 安装 dist\PolyXRD-Converter-Setup-v%APPVER%.exe (可改安装位置):
+echo      未注册启动应弹版权提示, 帮助菜单含「输入注册码」,
+echo      注册成功后状态栏右下显示注册的单位部门名称;
+echo   3. 两个 exe 各拖入 .raw / .txt 验证转换与预览。
 echo.
 pause
