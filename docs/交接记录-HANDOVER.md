@@ -1,6 +1,6 @@
-# PolyXRD Converter 转交记录（Handover）— 截至 v1.5.0（开发中）
+# PolyXRD Converter 转交记录（Handover）— 截至 v1.5.0（已发布）
 
-> 撰写日期：2026-10-10 ｜ 最近更新：2026-10-16 ｜ 当前最新发布：**v1.4.1**（commit `ee40392`，tag `v1.4.1`，Release id 412726479）；开发中：**v1.5.0**（双形态构建 + 注册机制，待提交发布）；前序发布：v1.4.0（commit `fc11da4`，Release id 409972391）
+> 撰写日期：2026-10-10 ｜ 最近更新：2026-10-16 ｜ 当前最新发布：**v1.5.0**（commit `13c4817`，tag `v1.5.0`，Release id 415056742，双资产 Internal + Setup）；前序发布：v1.4.1（commit `ee40392`，Release id 412726479）
 > 读者：接手本项目的后续开发者 / 协作模型。读完本文应能独立完成"改一个解析器 → 验证 → 发版"全流程。
 > 维护约定：本文是**持续更新的活文档**（文件名不挂版本号），每次发版只需更新 §1 能力矩阵、§4.1 断言数、§5 进展表、§7 已知问题；§6 踩坑只增不删。
 
@@ -122,11 +122,11 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 | v1.3.0 | 2026-10-10 | `bf6707a` | **GSAS-II 系格式移植**：新增 gsas / fp_dat / ras(.rasx) / xye / chi 五类文本读取器（格式知识参考 GSAS-II 开源 importer，按其许可注明来源） | 311 断言 + 冒烟 40 + 冻结 exe 自检 10/10；另与 GSAS-II 本体 oracle 对拍 |
 | v1.4.0 | 2026-10-12 | `fc11da4` | **界面三语化 + 即时切换**：新增日本語；原来切语言只改全局量、控件要重启才更新，现由 `_retranslate_ui()` 重译菜单/控件/清单/预览；格式名与目标格式名改由 key 动态翻译；读取层 30 条报错全部入表 | 607 断言（含三语一致性专项）+ 冒烟 50 + 冻结 exe 自检 10/10 |
 | v1.4.1 | 2026-10-14 | `ee40392` | **帮助菜单新增「版权」项**（与「关于」并列）：弹出双语（中 / 英）版权与许可说明 + 联系方式；构建产物文件名约定统一为连字符 `PolyXRD-Converter-vX.Y.Z.exe` | 609 断言（含三语一致性专项）+ 冒烟 50 + 冻结 exe 自检 2/2 |
-| v1.5.0 | 2026-10-16 | （待提交） | **双形态构建 + 注册机制**：接入 PolyXRD 家族统一注册 `registration.py`（HMAC-SHA256 离线注册码，未注册启动弹版权提示/帮助菜单「输入注册码」/状态栏最右显示注册单位名，状态存 `%APPDATA%/PolyXRD/Registration/` 每次启动重校验）；构建分 Setup 安装版（onedir + Inno Setup 安装包，含注册，可指定安装位置）与 Internal 内部评估版（onefile，无注册，状态栏右下「内部评估版本」）；新增 `tests/test_registration.py` 21 项 | 612 断言（含三语一致性专项）+ 冒烟 62（含注册 12 项）+ 注册单测 21 + 冻结 exe 自检 2/2 + 安装包静默安装实测 |
+| v1.5.0 | 2026-10-16 | `13c4817` | **双形态构建 + 注册机制**：接入 PolyXRD 家族统一注册 `registration.py`（HMAC-SHA256 离线注册码，未注册启动弹版权提示/帮助菜单「输入注册码」/状态栏最右显示注册单位名，状态存 `%APPDATA%/PolyXRD/Registration/` 每次启动重校验）；构建分 Setup 安装版（onedir + Inno Setup 安装包，含注册，可指定安装位置）与 Internal 内部评估版（onefile，无注册，状态栏右下「内部评估版本」）；新增 `tests/test_registration.py` 21 项 | 612 断言（含三语一致性专项）+ 冒烟 62（含注册 12 项）+ 注册单测 21 + 两形态冻结 exe 自检 2/2 + 安装包静默安装-自检-卸载实测全过 |
 
 **发布状态**：v1.4.0、v1.4.1 均已推送 GitHub 并发布 Release（exe + SHA256，哈希回下载闭环一致）。v1.4.1 Release id 412726479，资产 `PolyXRD-Converter-v1.4.1.exe` + `SHA256-v1.4.1.txt`，SHA256 `2299f4d53eb2d74691dca928fb333dabd2e4f41af7f6956c7fe80c6c52b43a0b`。
 **v1.4.1 发布说明**：帮助菜单新增「版权」项（与「关于」并列，弹出中英双语许可 + 联系方式）+ 二进制文件名约定统一为连字符 `PolyXRD-Converter-vX.Y.Z.exe`。前序 v1.4.0 及更早 Release 资产仍保留原命名（`PolyXRDConverter-v1.4.0.exe` 等），不强制更名。
-**v1.5.0（开发中，待提交）**：双形态构建 + 注册机制。产物改名 —— `PolyXRD-Converter-Internal-vX.Y.Z.exe`（内部单文件，无注册）与 `PolyXRD-Converter-Setup-vX.Y.Z.exe`（Inno Setup 安装包，含注册）；旧 `PolyXRDConverter.spec` 已删除，拆为 `PolyXRDConverter-Internal.spec`（excludes 注册模块）与 `PolyXRDConverter-Setup.spec`（onedir + COLLECT）；安装脚本 `installer/PolyXRD-Converter.iss`（中文向导语言文件随仓库分发 `installer/ChineseSimplified.isl`）；SHA256 两产物合并写一份 `SHA256-vX.Y.Z.txt`；注册模块复用 `D:\Project\XRD\PolyXRD-Reg\registration.py` 原样拷贝（家族共享 HMAC 密钥，与 RegTool/GetCIF 出的码互通）。
+**v1.5.0（已发布，Release id 415056742）**：双形态构建 + 注册机制。产物改名 —— `PolyXRD-Converter-Internal-v1.5.0.exe`（内部单文件，无注册，SHA256 `70ca38b7…d67559`）与 `PolyXRD-Converter-Setup-v1.5.0.exe`（Inno Setup 安装包，含注册，SHA256 `2bed84e9…c8632f`）；旧 `PolyXRDConverter.spec` 已删除，拆为 `PolyXRDConverter-Internal.spec`（excludes 注册模块）与 `PolyXRDConverter-Setup.spec`（onedir + COLLECT）；安装脚本 `installer/PolyXRD-Converter.iss`（中文向导语言文件随仓库分发 `installer/ChineseSimplified.isl`）；SHA256 两产物合并写一份 `SHA256-v1.5.0.txt`；注册模块复用 `D:\Project\XRD\PolyXRD-Reg\registration.py` 原样拷贝（家族共享 HMAC 密钥，与 RegTool/GetCIF 出的码互通）。
 
 **文档同步状态（2026-10-12 全量核对）**：README（版本/下载/三语/文档入口）、本文、GitHub 仓库简介与 topics、各版本 Release 正文均已对齐 v1.4.0；顺带修掉 v1.3.0/v1.4.0 Release 里误写的「MIT」许可口径（见 §8 备忘）。
 
