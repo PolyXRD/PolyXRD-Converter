@@ -2,7 +2,7 @@
 
 **XRD 谱图格式转换器** —— 从 [PolyXRD](https://github.com/PolyXRD/PolyXRD) 独立剥离的轻量小工具：把各种厂商/软件导出的谱图文件互转成你需要的目标格式，**多厂商 RAW 二进制自动识别**，双击即用，无需安装。
 
-**当前版本 v1.4.1** ｜ [下载最新 exe](https://github.com/PolyXRD/PolyXRD-Converter/releases/latest)（单文件，约 55 MB，附 SHA-256） ｜ 界面语言：简体中文 / English / 日本語
+**当前版本 v1.5.0** ｜ [下载最新 Release](https://github.com/PolyXRD/PolyXRD-Converter/releases/latest)（Setup 安装包 / Internal 单文件 exe，附 SHA-256） ｜ 界面语言：简体中文 / English / 日本語
 
 <div align="center"><img src="src/polyxrd_converter/resources/icon.png" alt="PolyXRD Converter" width="96"></div>
 
@@ -14,6 +14,24 @@
 - **谱图预览**：手绘曲线（不依赖 matplotlib），滚轮缩放 / 拖拽平移 / 双击复位 / 最强峰标记
 - **角度轴护栏**：RAW 头参数损坏时**宁可标记不可信也不硬猜**——拒绝自动转换并引导人工指定 `(起始 2θ, 步长)`，杜绝产出峰位错误的谱图
 - **三语界面**：简体中文 / English / 日本語，菜单栏「语言」切换**即时生效**（无需重启）；语言名为母语写法，加新语言只需在 `i18n.py` 加一张表
+- **双形态构建（v1.5.0）**：Setup 安装版（含注册机制）与 Internal 内部评估版（无注册机制）两个二进制，见下「两个版本」
+
+## 两个版本（v1.5.0 起）
+
+| | **Setup 安装版** | **Internal 内部评估版** |
+|---|---|---|
+| 产物 | `PolyXRD-Converter-Setup-vX.Y.Z.exe`（Inno Setup 安装包） | `PolyXRD-Converter-Internal-vX.Y.Z.exe`（单文件，双击即用） |
+| 注册机制 | ✅ 有（见下「注册」） | ❌ 无 |
+| 状态栏右下 | 未注册 / 已注册：单位部门名称 | 固定「内部评估版本」 |
+| 适用 | 对外分发 / 需版权管理 | 内部自用评估 |
+
+## 注册（Setup 安装版）
+
+- **未注册**：每次启动弹提示「本软件未注册，版权所有，禁止用于商业用途。如需注册请联系 sshztx@outlook.com」——点「确定」可继续正常使用，仅提示；点「输入注册码」当场注册
+- **获取注册码**：把**单位部门名称**发给 sshztx@outlook.com，由开发方生成形如 `PXRD1-XXXX-XXXX-...` 的注册码（HMAC-SHA256 离线算法，与 PolyXRD 家族各软件通用）
+- **输入注册码**：菜单栏「帮助」→「输入注册码 (&R)…」粘贴即可；支持带/不带前缀、任意空格连字符、大小写混输
+- **注册后**：状态栏**最右侧**显示「已注册：单位部门名称」，此后启动不再弹提示；同一单位多台电脑可用同一注册码（不绑机器）
+- **注册状态**：存 `%APPDATA%\PolyXRD\Registration\PolyXRD_Converter.json`，每次启动重新校验注册码（手改 JSON 伪造无效）；卸载软件不清除，重装后仍已注册
 
 ## RAW 多厂商自动识别
 
@@ -71,8 +89,9 @@ convert_file("spectrum.raw", "spectrum.xrdml")   # 单文件转换
 真实样本全量交叉校验（与同谱其它格式导出逐点比对）：
 
 ```
-python tests/validate_samples.py     # 609 项断言
-python tests/smoke_gui.py            # GUI 离屏冒烟 50 项
+python tests/validate_samples.py     # 612 项断言
+python tests/smoke_gui.py            # GUI 离屏冒烟 62 项
+python tests/test_registration.py    # 注册机制 21 项 (纯 stdlib)
 ```
 
 覆盖：
@@ -84,7 +103,8 @@ python tests/smoke_gui.py            # GUI 离屏冒烟 50 项
 - **Jade**：文本导出按头建轴 + 峰位交叉
 - **GSAS-II 系文本格式**：`.gsas/.fxye`（FXYE/FXY/ESD/STD）、FullProf `.dat`、Rigaku `.ras/.rasx`、Topas `.xye/.qye`、Fit2D `.chi/.qchi` 合成样本全格式回归，并以 GSAS-II 本体（Argonne 开源参考实现）做 oracle 逐点对拍 —— 10 种格式与 GSAS-II 完全一致，4 项跳过均为 GSAS-II 自身缺陷（STD `int()` 崩溃、Fit2D 头误入 pyFAI 分支等），本实现均规避
 - 8 种格式往返守恒
-- **三语一致性（v1.4.1）**：140 条文案 × 3 语言的 key 集合齐平、占位符同名同数量、每条都能 `format` 通过；读取/写出格式名在三种语言下均有译文；抽取按钮/菜单/「关于」等 6 条做「三语互不相同」守卫（防整表复制没改）；帮助菜单新增「版权」项（`menu.help.copyright`，中/英/日）。另有 3 项针对 UI 的冒烟断言：切到 ja/en/zh 后按钮、表头、菜单栏、目标格式下拉、已载入行的「识别格式」列全部即时重译
+- **三语一致性（v1.5.0）**：141 条文案 × 3 语言的 key 集合齐平、占位符同名同数量、每条都能 `format` 通过；读取/写出格式名在三种语言下均有译文；抽取按钮/菜单/「关于」等 7 条做「三语互不相同」守卫（防整表复制没改）。另有 3 项针对 UI 的冒烟断言：切到 ja/en/zh 后按钮、表头、菜单栏、目标格式下拉、已载入行的「识别格式」列全部即时重译
+- **注册机制（v1.5.0）**：出码-验码 21 项（中英单位名往返、输入容错、篡改拒绝、状态文件防伪造、三语状态文案）；GUI 冒烟 12 项（未注册提示流程、注册后状态栏显示单位名并随语言即时重译、内部评估版无注册菜单且显示「内部评估版本」）
 
 ## 文档
 
@@ -96,7 +116,7 @@ python tests/smoke_gui.py            # GUI 离屏冒烟 50 项
 python -m venv venv
 venv\Scripts\pip install -e . pyinstaller
 python main.py                 # 源码运行
-build.bat                      # 打包单文件 exe
+build.bat                      # 双形态打包: Internal 单文件 + Setup 安装包 (需 Inno Setup 6)
 ```
 
 ### 加一种新语言
