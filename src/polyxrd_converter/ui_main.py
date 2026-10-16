@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from PySide6.QtCore import QObject, Qt, QThread, QUrl, Signal
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, QUrl, Signal
 from PySide6.QtGui import (
     QAction,
     QActionGroup,
@@ -52,12 +52,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from polyxrd_converter import __version__
+from polyxrd_converter import __app_name__, __version__
 from polyxrd_converter.converter import probe
 from polyxrd_converter.i18n import LANGS, fmt_label, lang_name, language, set_language, tr
 from polyxrd_converter.loader import detect_format
 from polyxrd_converter.raw_formats import detect_raw_parser
 from polyxrd_converter.ui_preview import SpectrumView
+
+try:  # 注册机制 (Setup/安装版); 内部评估版构建时被 spec excludes 剔除
+    from polyxrd_converter import registration
+except ImportError:  # pragma: no cover —— 仅冻结内部版走到这里
+    registration = None  # type: ignore[assignment]
 from polyxrd_converter.writers import TARGET_EXTS, TARGET_FORMATS
 
 _STATUS_KEYS = {
@@ -269,9 +274,24 @@ class MainWindow(QMainWindow):
         self._thread: Optional[QThread] = None
         self._worker: Optional[ConvertWorker] = None
 
+        # 注册机制 (Setup 版): 启动即读注册状态, 供状态栏/帮助菜单使用。
+        # 内部评估版 registration=None, 状态栏改显示「内部评估版本」。
+        self._reg = None
+        if registration is not None:
+            registration.set_language(language())
+            self._reg = registration.RegistrationManager(
+                __app_name__, registration.default_state_path("PolyXRD-Converter")
+            )
+
         self._build_ui()
+        self._build_statusbar()
         self._build_menu()
         self._update_buttons()
+
+        # 未注册启动提示 (QTimer 保证窗口 show 后事件循环内弹出, 不阻塞构造;
+        # 离屏/冒烟环境模块内部自动跳过)。
+        if self._reg is not None:
+            QTimer.singleShot(0, lambda: self._reg.startup_check(self))
 
     # ---- UI ----------------------------------------------------------
 
@@ -414,6 +434,30 @@ class MainWindow(QMainWindow):
         """行的格式展示名: 按当前语言重查 (RAW 变体走 raw_variant)。"""
         return fmt_label(row.fmt_key, fallback=row.format_label) or "…"
 
+    def _build_statusbar(self) -> None:
+        """底部状态栏: 常规消息区 + **最右侧**常驻标签。
+
+        Setup 版: 注册状态标签 (未注册 / 已注册：单位部门名称, 右对齐贴右端);
+        内部评估版: 固定显示「内部评估版本」。
+        """
+        bar = self.statusBar()
+        if self._reg is not None:
+            self._reg_label = self._reg.attach_status_label(bar, self)
+        else:
+            self._reg_label = QLabel(tr("statusbar.internal"))
+            self._reg_label.setObjectName("regStatusLabel")
+            self._reg_label.setAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
+            bar.addPermanentWidget(self._reg_label, 1)
+
+    def _refresh_status_label(self) -> None:
+        """按当前语言刷新状态栏右侧标签 (语言切换 / 注册成功后调用)。"""
+        if self._reg is not None:
+            registration.refresh_status_label(self._reg_label, self._reg.state)
+        else:
+            self._reg_label.setText(tr("statusbar.internal"))
+
     def _build_menu(self) -> None:
         bar = self.menuBar()
         mf = bar.addMenu(tr("menu.file"))
@@ -447,10 +491,14 @@ class MainWindow(QMainWindow):
         cp.triggered.connect(self._on_copyright)
         mh.addAction(ab)
         mh.addAction(cp)
+        if self._reg is not None:  # 「输入注册码 (&R)…」(仅 Setup 版)
+            self._reg.add_help_action(mh, self)
 
     def _switch_lang(self, lang: str) -> None:
         """切换界面语言: 菜单/控件/清单/预览全部即时重译, 无需重启。"""
         set_language(lang)
+        if registration is not None:  # 注册模块内置三语文案同步
+            registration.set_language(lang)
         self._retranslate_ui()
         self._log.appendPlainText(tr("tip.lang_switched", lang=lang_name(lang)))
 
@@ -482,6 +530,8 @@ class MainWindow(QMainWindow):
         self._refresh_table()
         self._update_preview()
         self._preview.update()
+        # 4) 状态栏右侧标签 (注册状态 / 内部评估版本)
+        self._refresh_status_label()
 
     # ---- 文件清单 ----------------------------------------------------
 

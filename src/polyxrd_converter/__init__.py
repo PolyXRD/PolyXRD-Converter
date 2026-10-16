@@ -26,9 +26,15 @@ v1.4.0: 界面三语化 (简体中文 / English / 日本語) 并做到**切换�
 v1.4.1: 帮助菜单新增「版权」项 (与「关于」并列), 弹出双语 (中 / 英) 版权与许可说明
 + 联系方式; 构建产物文件名约定统一为连字符 (PolyXRD-Converter-vX.Y.Z.exe /
 最新版 PolyXRD-Converter.exe), 取代早期的无空格连写命名。
+v1.5.0: 双形态构建 + 注册机制 —— 接入 PolyXRD 家族统一注册 (registration.py,
+HMAC-SHA256 离线注册码): 未注册每次启动弹版权提示 (确定可继续用 / 输入注册码),
+帮助菜单加「输入注册码」, 注册后状态栏最右显示单位部门名称, 注册状态存
+%APPDATA%/PolyXRD/Registration/ 且每次启动重新校验。构建形态分两版:
+Setup 安装版 (onedir + Inno Setup 安装包, 含注册机制, 可指定安装位置) 与
+Internal 内部评估版 (onefile 单文件, 无注册机制, 状态栏右下显示「内部评估版本」)。
 """
 
-__version__ = "1.4.1"
+__version__ = "1.5.0"
 __author__ = "PolyXRD Team"
 __app_name__ = "PolyXRD Converter"
 
