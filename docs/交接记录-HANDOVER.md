@@ -1,6 +1,6 @@
-# PolyXRD Converter 转交记录（Handover）— 截至 v1.5.0（已发布）
+# PolyXRD Converter 转交记录（Handover）— 截至 v1.5.1
 
-> 撰写日期：2026-10-10 ｜ 最近更新：2026-10-16 ｜ 当前最新发布：**v1.5.0**（commit `13c4817`，tag `v1.5.0`，Release id 415056742，双资产 Internal + Setup）；前序发布：v1.4.1（commit `ee40392`，Release id 412726479）
+> 撰写日期：2026-10-10 ｜ 最近更新：2026-10-23 ｜ 最新 GitHub 发布：**v1.5.0**（commit `13c4817`，tag `v1.5.0`，Release id 415056742，双资产 Internal + Setup）；另有 **v1.5.1 已并入主线代码但未发 Release**（仅本地打包内部评估版）；前序发布：v1.4.1（commit `ee40392`，Release id 412726479）
 > 读者：接手本项目的后续开发者 / 协作模型。读完本文应能独立完成"改一个解析器 → 验证 → 发版"全流程。
 > 维护约定：本文是**持续更新的活文档**（文件名不挂版本号），每次发版只需更新 §1 能力矩阵、§4.1 断言数、§5 进展表、§7 已知问题；§6 踩坑只增不删。
 
@@ -123,10 +123,13 @@ GUI 冒烟覆盖：拖放探测/格式识别/预览出图/转换落盘回读守�
 | v1.4.0 | 2026-10-12 | `fc11da4` | **界面三语化 + 即时切换**：新增日本語；原来切语言只改全局量、控件要重启才更新，现由 `_retranslate_ui()` 重译菜单/控件/清单/预览；格式名与目标格式名改由 key 动态翻译；读取层 30 条报错全部入表 | 607 断言（含三语一致性专项）+ 冒烟 50 + 冻结 exe 自检 10/10 |
 | v1.4.1 | 2026-10-14 | `ee40392` | **帮助菜单新增「版权」项**（与「关于」并列）：弹出双语（中 / 英）版权与许可说明 + 联系方式；构建产物文件名约定统一为连字符 `PolyXRD-Converter-vX.Y.Z.exe` | 609 断言（含三语一致性专项）+ 冒烟 50 + 冻结 exe 自检 2/2 |
 | v1.5.0 | 2026-10-16 | `13c4817` | **双形态构建 + 注册机制**：接入 PolyXRD 家族统一注册 `registration.py`（HMAC-SHA256 离线注册码，未注册启动弹版权提示/帮助菜单「输入注册码」/状态栏最右显示注册单位名，状态存 `%APPDATA%/PolyXRD/Registration/` 每次启动重校验）；构建分 Setup 安装版（onedir + Inno Setup 安装包，含注册，可指定安装位置）与 Internal 内部评估版（onefile，无注册，状态栏右下「内部评估版本」）；新增 `tests/test_registration.py` 21 项 | 612 断言（含三语一致性专项）+ 冒烟 62（含注册 12 项）+ 注册单测 21 + 两形态冻结 exe 自检 2/2 + 安装包静默安装-自检-卸载实测全过 |
+| v1.5.1 | 2026-10-23 | 见 git log | **内部评估版状态栏提示改版（纯外观）**：「内部评估版本」由右下角右对齐改为**整条状态栏水平居中**，字号沿用默认 9pt 不变、字体加粗、颜色改为红色 `#ff0000`；为抵消 QStatusBar 给右下 size grip 预留的宽度（实测 24px，无公开 API），在 `MainWindow.resizeEvent` 后按几何差反推并写成标签左边距，实测 900/1100/1600 宽度下红字渲染中心与状态栏几何中心偏差恒为 +0.5px（预留宽度按几何差反推，离屏 24px / 原生 20px 自适应）；加粗经 A/B 渲染验证（红像素 209→338），字号仍为全局 9.5pt 未变；Setup 版的注册标签行为不变 | 612 断言 + 冒烟 65（新增 3 项：居中/加粗/红色）+ 注册单测 21 |
 
 **发布状态**：v1.4.0、v1.4.1 均已推送 GitHub 并发布 Release（exe + SHA256，哈希回下载闭环一致）。v1.4.1 Release id 412726479，资产 `PolyXRD-Converter-v1.4.1.exe` + `SHA256-v1.4.1.txt`，SHA256 `2299f4d53eb2d74691dca928fb333dabd2e4f41af7f6956c7fe80c6c52b43a0b`。
 **v1.4.1 发布说明**：帮助菜单新增「版权」项（与「关于」并列，弹出中英双语许可 + 联系方式）+ 二进制文件名约定统一为连字符 `PolyXRD-Converter-vX.Y.Z.exe`。前序 v1.4.0 及更早 Release 资产仍保留原命名（`PolyXRDConverter-v1.4.0.exe` 等），不强制更名。
 **v1.5.0（已发布，Release id 415056742）**：双形态构建 + 注册机制。产物改名 —— `PolyXRD-Converter-Internal-v1.5.0.exe`（内部单文件，无注册，SHA256 `70ca38b7…d67559`）与 `PolyXRD-Converter-Setup-v1.5.0.exe`（Inno Setup 安装包，含注册，SHA256 `2bed84e9…c8632f`）；旧 `PolyXRDConverter.spec` 已删除，拆为 `PolyXRDConverter-Internal.spec`（excludes 注册模块）与 `PolyXRDConverter-Setup.spec`（onedir + COLLECT）；安装脚本 `installer/PolyXRD-Converter.iss`（中文向导语言文件随仓库分发 `installer/ChineseSimplified.isl`）；SHA256 两产物合并写一份 `SHA256-v1.5.0.txt`；注册模块复用 `D:\Project\XRD\PolyXRD-Reg\registration.py` 原样拷贝（家族共享 HMAC 密钥，与 RegTool/GetCIF 出的码互通）。
+
+**v1.5.1（仅内部，未发 Release）**：内部评估版状态栏「内部评估版本」提示改为状态栏**居中 + 加粗 + 红色**（字号不变），属纯外观微调 —— 解析/写出/注册逻辑零改动。代码已并入主线并推 GitHub，但**只在本地产出 `dist/` 内部评估版二进制，未上传 Release、未打 tag**；因此 GitHub 上的「最新 Release」仍是 v1.5.0。若要对外发布 v1.5.1，按 §7 发版流程补 Setup 包、SHA256、tag 与 Release 即可。
 
 **文档同步状态（2026-10-12 全量核对）**：README（版本/下载/三语/文档入口）、本文、GitHub 仓库简介与 topics、各版本 Release 正文均已对齐 v1.4.0；顺带修掉 v1.3.0/v1.4.0 Release 里误写的「MIT」许可口径（见 §8 备忘）。
 

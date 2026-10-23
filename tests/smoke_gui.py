@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 import numpy as np  # noqa: E402
-from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer  # noqa: E402
+from PySide6.QtCore import QCoreApplication, QEventLoop, Qt, QTimer  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from polyxrd_converter import __version__  # noqa: E402
@@ -312,7 +312,13 @@ def main() -> int:
         win_int = MainWindow()
         check(win_int._reg is None, "内部评估版不创建 RegistrationManager")
         check(win_int._reg_label.text() == tr("statusbar.internal"),
-              f"内部评估版状态栏右下 = {win_int._reg_label.text()!r}")
+              f"内部评估版状态栏提示 = {win_int._reg_label.text()!r}")
+        # v1.5.1: 居中 + 加粗 + 红色
+        check(bool(win_int._reg_label.alignment() & Qt.AlignmentFlag.AlignHCenter),
+              f"内部评估版提示水平居中 (align={win_int._reg_label.alignment()})")
+        check(win_int._reg_label.font().bold(), "内部评估版提示字体加粗")
+        check("color:#ff0000" in win_int._reg_label.styleSheet().replace(" ", "").lower(),
+              f"内部评估版提示为红色 (qss={win_int._reg_label.styleSheet()!r})")
         help_acts_i = [a.text() for a in win_int.menuBar().actions()[-1].menu().actions()]
         check(len(help_acts_i) == 2 and not any("注册" in t for t in help_acts_i),
               f"内部评估版帮助菜单 2 项无注册项: {help_acts_i}")

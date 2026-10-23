@@ -32,9 +32,11 @@ HMAC-SHA256 离线注册码): 未注册每次启动弹版权提示 (确定可继
 %APPDATA%/PolyXRD/Registration/ 且每次启动重新校验。构建形态分两版:
 Setup 安装版 (onedir + Inno Setup 安装包, 含注册机制, 可指定安装位置) 与
 Internal 内部评估版 (onefile 单文件, 无注册机制, 状态栏右下显示「内部评估版本」)。
+v1.5.1: 内部评估版的「内部评估版本」提示改为在状态栏**水平居中**显示, 字号不变、
+字体加粗、颜色改为红色 (纯外观调整, 功能与格式解析行为零变化)。
 """
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"
 __author__ = "PolyXRD Team"
 __app_name__ = "PolyXRD Converter"
 

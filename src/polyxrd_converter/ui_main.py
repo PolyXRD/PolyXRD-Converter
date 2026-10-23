@@ -435,10 +435,11 @@ class MainWindow(QMainWindow):
         return fmt_label(row.fmt_key, fallback=row.format_label) or "…"
 
     def _build_statusbar(self) -> None:
-        """底部状态栏: 常规消息区 + **最右侧**常驻标签。
+        """底部状态栏: 常规消息区 + 常驻标签。
 
         Setup 版: 注册状态标签 (未注册 / 已注册：单位部门名称, 右对齐贴右端);
-        内部评估版: 固定显示「内部评估版本」。
+        内部评估版: 固定显示「内部评估版本」, **整条状态栏水平居中**, 字号不变、
+        加粗、红色 (醒目提醒这是评估构建)。
         """
         bar = self.statusBar()
         if self._reg is not None:
@@ -447,9 +448,46 @@ class MainWindow(QMainWindow):
             self._reg_label = QLabel(tr("statusbar.internal"))
             self._reg_label.setObjectName("regStatusLabel")
             self._reg_label.setAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
             )
+            # 字号沿用状态栏默认值, 不调大也不调小; 只加粗。
+            f = self._reg_label.font()
+            f.setBold(True)
+            self._reg_label.setFont(f)
+            self._reg_label.setStyleSheet("color:#ff0000;")
+            # stretch=1 让标签吃掉状态栏剩余宽度, 居中即整条状态栏居中。
             bar.addPermanentWidget(self._reg_label, 1)
+            self._balance_status_label()
+
+    def _balance_status_label(self) -> None:
+        """抵消状态栏右下 size grip 的预留宽度, 让评估版提示文字真正居中。
+
+        QStatusBar 会给 size grip 预留一段宽度 (实测 ~24px), 标签可用区因此左偏;
+        该宽度没有公开 API 可查, 只能由布局后的几何差反推。grip 宽度与窗口大小
+        无关, 所以在窗口尺寸变化后重算一次, 并写成标签左边距 (文字随之右移
+        预留/2) 即可; 左边距一旦等于预留宽度就不再写入, 避免与布局互相触发。
+        Setup 版 (右对齐) 不受影响, 直接跳过。
+        """
+        lab = getattr(self, "_reg_label", None)
+        if lab is None or self._reg is not None:
+            return
+        bar = self.statusBar()
+        if bar.width() < 200:  # 布局尚未完成, 几何不可信
+            return
+        g = lab.geometry()
+        if g.width() <= 0:
+            return
+        reserve = bar.width() - (g.x() + g.width())
+        # 合理上限: size grip 远小于 80px; 超出即视为布局未稳, 本次不处理。
+        if not 0 < reserve <= 80:
+            return
+        if lab.contentsMargins().left() != reserve:
+            lab.setContentsMargins(reserve, 0, 0, 0)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt 命名)
+        super().resizeEvent(event)
+        # 延后到本轮布局完成后再量几何, 否则拿到的是窗口未 show/未排版的旧宽度。
+        QTimer.singleShot(0, self._balance_status_label)
 
     def _refresh_status_label(self) -> None:
         """按当前语言刷新状态栏右侧标签 (语言切换 / 注册成功后调用)。"""

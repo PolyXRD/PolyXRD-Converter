@@ -3,7 +3,7 @@ chcp 65001 >nul
 REM -- UTF-8 everywhere: 中文路径/日志不乱码
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
-title PolyXRD Converter v1.5.0 双形态打包构建器
+title PolyXRD Converter v1.5.1 双形态打包构建器
 echo ==============================================
 echo   PolyXRD Converter - 双形态构建
 echo   1. Internal 单文件 exe (无注册机制)
@@ -118,8 +118,8 @@ echo   dist\PolyXRD-Converter-Setup-v%APPVER%.exe           (Setup 安装包, �
 echo   dist\SHA256-v%APPVER%.txt                            (两产物合并校验和)
 echo.
 echo 人工冒烟验收建议:
-echo   1. 双击 dist\PolyXRD-Converter-Internal.exe: 状态栏右下应显示「内部评估版本」,
-echo      帮助菜单只有 关于/版权 两项, 无启动提示;
+echo   1. 双击 dist\PolyXRD-Converter-Internal.exe: 状态栏**居中**应显示红色加粗的
+echo      「内部评估版本」, 帮助菜单只有 关于/版权 两项, 无启动提示;
 echo   2. 安装 dist\PolyXRD-Converter-Setup-v%APPVER%.exe (可改安装位置):
 echo      未注册启动应弹版权提示, 帮助菜单含「输入注册码」,
 echo      注册成功后状态栏右下显示注册的单位部门名称;

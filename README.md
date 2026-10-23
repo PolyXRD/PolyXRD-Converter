@@ -2,7 +2,7 @@
 
 **XRD 谱图格式转换器** —— 从 [PolyXRD](https://github.com/PolyXRD/PolyXRD) 独立剥离的轻量小工具：把各种厂商/软件导出的谱图文件互转成你需要的目标格式，**多厂商 RAW 二进制自动识别**，双击即用，无需安装。
 
-**当前版本 v1.5.0** ｜ [下载最新 Release](https://github.com/PolyXRD/PolyXRD-Converter/releases/latest)（Setup 安装包 / Internal 单文件 exe，附 SHA-256） ｜ 界面语言：简体中文 / English / 日本語
+**当前版本 v1.5.1** ｜ [下载最新 Release](https://github.com/PolyXRD/PolyXRD-Converter/releases/latest)（Setup 安装包 / Internal 单文件 exe，附 SHA-256） ｜ 界面语言：简体中文 / English / 日本語
 
 <div align="center"><img src="src/polyxrd_converter/resources/icon.png" alt="PolyXRD Converter" width="96"></div>
 
@@ -22,7 +22,7 @@
 |---|---|---|
 | 产物 | `PolyXRD-Converter-Setup-vX.Y.Z.exe`（Inno Setup 安装包） | `PolyXRD-Converter-Internal-vX.Y.Z.exe`（单文件，双击即用） |
 | 注册机制 | ✅ 有（见下「注册」） | ❌ 无 |
-| 状态栏右下 | 未注册 / 已注册：单位部门名称 | 固定「内部评估版本」 |
+| 状态栏 | 未注册 / 已注册：单位部门名称（右对齐） | 固定「内部评估版本」（整条状态栏居中、加粗、红字） |
 | 适用 | 对外分发 / 需版权管理 | 内部自用评估 |
 
 ## 注册（Setup 安装版）
@@ -90,7 +90,7 @@ convert_file("spectrum.raw", "spectrum.xrdml")   # 单文件转换
 
 ```
 python tests/validate_samples.py     # 612 项断言
-python tests/smoke_gui.py            # GUI 离屏冒烟 62 项
+python tests/smoke_gui.py            # GUI 离屏冒烟 65 项
 python tests/test_registration.py    # 注册机制 21 项 (纯 stdlib)
 ```
 
@@ -105,6 +105,7 @@ python tests/test_registration.py    # 注册机制 21 项 (纯 stdlib)
 - 8 种格式往返守恒
 - **三语一致性（v1.5.0）**：141 条文案 × 3 语言的 key 集合齐平、占位符同名同数量、每条都能 `format` 通过；读取/写出格式名在三种语言下均有译文；抽取按钮/菜单/「关于」等 7 条做「三语互不相同」守卫（防整表复制没改）。另有 3 项针对 UI 的冒烟断言：切到 ja/en/zh 后按钮、表头、菜单栏、目标格式下拉、已载入行的「识别格式」列全部即时重译
 - **注册机制（v1.5.0）**：出码-验码 21 项（中英单位名往返、输入容错、篡改拒绝、状态文件防伪造、三语状态文案）；GUI 冒烟 12 项（未注册提示流程、注册后状态栏显示单位名并随语言即时重译、内部评估版无注册菜单且显示「内部评估版本」）
+- **内部评估版状态栏（v1.5.1）**：冒烟新增 3 项 —— 提示文字水平居中（`AlignHCenter`）、字体加粗、样式为红色 `#ff0000`；另在原生 Windows 渲染下实测 900 / 1100 / 1600 三种窗口宽度，红字实际渲染中心与状态栏几何中心偏差恒为 **+0.5px**（QStatusBar 为右下 size grip 预留的宽度已用标签左边距补偿，预留宽度由几何差反推，离屏 24px / 原生 20px 均自适应）；加粗经 A/B 渲染验证（同字号下红像素 209 → 338），字号仍为全局 9.5pt 未变
 
 ## 文档
 
