@@ -1,147 +1,147 @@
 # PolyXRD Converter
 
-**XRD 谱图格式转换器** —— 从 [PolyXRD](https://github.com/PolyXRD/PolyXRD) 独立剥离的轻量小工具：把各种厂商/软件导出的谱图文件互转成你需要的目标格式，**多厂商 RAW 二进制自动识别**，双击即用，无需安装。
+**XRD pattern format converter** — a lightweight tool spun off from [PolyXRD](https://github.com/PolyXRD/PolyXRD): convert pattern files exported by various vendors/software into the target format you need, with **automatic detection of multi-vendor binary RAW**, double-click to run, no installation required.
 
-**当前版本 v1.5.1** ｜ [下载最新 Release](https://github.com/PolyXRD/PolyXRD-Converter/releases/latest)（Setup 安装包 / Internal 单文件 exe，附 SHA-256） ｜ 界面语言：简体中文 / English / 日本語
+**Current version v1.5.1** ｜ [Download the latest Release](https://github.com/PolyXRD/PolyXRD-Converter/releases/latest) (Setup installer / Internal single-file exe, with SHA-256) ｜ UI languages: Simplified Chinese / English / Japanese
 
 <div align="center"><img src="src/polyxrd_converter/resources/icon.png" alt="PolyXRD Converter" width="96"></div>
 
-## 功能
+## Features
 
-- **读入**：`xy` `txt` `dat` `csv` `smz` `mdi` `xrdml/xml` `brml` `json`，GSAS 粉末数据（`gsas`/`fxye`/`gda`，FXYE/FXY/ESD/STD 四种 BANK 类型）、FullProf `.dat`、理学 `.ras`/`.rasx`、Topas `.xye`/`.qye`、Fit2D `.chi`/`.qchi`，以及多厂商二进制 `RAW`（自动识别，见下表）；岛津项目的 `.ORG/.RSM/.RBG/.RK1/.RAX/.RLZ/.RFI` 与 `.RAW` 同结构，一并支持
-- **写出**：`xy` `txt` `dat` `csv` `mdi` `raw` `xrdml` `json`
-- **批量转换**：拖入整个目录，后台线程逐个转换，实时进度
-- **谱图预览**：手绘曲线（不依赖 matplotlib），滚轮缩放 / 拖拽平移 / 双击复位 / 最强峰标记
-- **角度轴护栏**：RAW 头参数损坏时**宁可标记不可信也不硬猜**——拒绝自动转换并引导人工指定 `(起始 2θ, 步长)`，杜绝产出峰位错误的谱图
-- **三语界面**：简体中文 / English / 日本語，菜单栏「语言」切换**即时生效**（无需重启）；语言名为母语写法，加新语言只需在 `i18n.py` 加一张表
-- **双形态构建（v1.5.0）**：Setup 安装版（含注册机制）与 Internal 内部评估版（无注册机制）两个二进制，见下「两个版本」
+- **Read**: `xy` `txt` `dat` `csv` `smz` `mdi` `xrdml/xml` `brml` `json`, GSAS powder data (`gsas`/`fxye`/`gda`, four BANK types FXYE/FXY/ESD/STD), FullProf `.dat`, Rigaku `.ras`/`.rasx`, Topas `.xye`/`.qye`, Fit2D `.chi`/`.qchi`, and multi-vendor binary `RAW` (auto-detected, see the table below); the `.ORG/.RSM/.RBG/.RK1/.RAX/.RLZ/.RFI` files of Shimadzu projects share the same structure as `.RAW` and are supported as well
+- **Write**: `xy` `txt` `dat` `csv` `mdi` `raw` `xrdml` `json`
+- **Batch conversion**: drag in an entire directory, a background thread converts files one by one with live progress
+- **Pattern preview**: hand-drawn curve (no matplotlib dependency), scroll to zoom / drag to pan / double-click to reset / strongest-peak marker
+- **Angle-axis guardrail**: when RAW header parameters are corrupted, **rather mark the axis as untrustworthy than guess** — automatic conversion is refused and you are guided to specify `(start 2θ, step)` manually, preventing the output of patterns with wrong peak positions
+- **Trilingual UI**: Simplified Chinese / English / Japanese, switched via the menu bar "Language" with **immediate effect** (no restart); language names use native spelling, and adding a new language only requires adding a table in `i18n.py`
+- **Dual-edition build (v1.5.0)**: two binaries, Setup installer (with registration mechanism) and Internal evaluation build (without registration mechanism), see "Two editions" below
 
-## 两个版本（v1.5.0 起）
+## Two editions (since v1.5.0)
 
-| | **Setup 安装版** | **Internal 内部评估版** |
+| | **Setup installer** | **Internal evaluation build** |
 |---|---|---|
-| 产物 | `PolyXRD-Converter-Setup-vX.Y.Z.exe`（Inno Setup 安装包） | `PolyXRD-Converter-Internal-vX.Y.Z.exe`（单文件，双击即用） |
-| 注册机制 | ✅ 有（见下「注册」） | ❌ 无 |
-| 状态栏 | 未注册 / 已注册：单位部门名称（右对齐） | 固定「内部评估版本」（整条状态栏居中、加粗、红字） |
-| 适用 | 对外分发 / 需版权管理 | 内部自用评估 |
+| Artifact | `PolyXRD-Converter-Setup-vX.Y.Z.exe` (Inno Setup installer) | `PolyXRD-Converter-Internal-vX.Y.Z.exe` (single file, double-click to run) |
+| Registration mechanism | ✅ Yes (see "Registration" below) | ❌ No |
+| Status bar | Unregistered / Registered: institution/department name (right-aligned) | Fixed "Internal Evaluation Version" (centered in the whole status bar, bold, red text) |
+| Use case | External distribution / copyright management needed | Internal self-use evaluation |
 
-## 注册（Setup 安装版）
+## Registration (Setup installer)
 
-- **未注册**：每次启动弹提示「本软件未注册，版权所有，禁止用于商业用途。如需注册请联系 sshztx@outlook.com」——点「确定」可继续正常使用，仅提示；点「输入注册码」当场注册
-- **获取注册码**：把**单位部门名称**发给 sshztx@outlook.com，由开发方生成形如 `PXRD1-XXXX-XXXX-...` 的注册码（HMAC-SHA256 离线算法，与 PolyXRD 家族各软件通用）
-- **输入注册码**：菜单栏「帮助」→「输入注册码 (&R)…」粘贴即可；支持带/不带前缀、任意空格连字符、大小写混输
-- **注册后**：状态栏**最右侧**显示「已注册：单位部门名称」，此后启动不再弹提示；同一单位多台电脑可用同一注册码（不绑机器）
-- **注册状态**：存 `%APPDATA%\PolyXRD\Registration\PolyXRD_Converter.json`，每次启动重新校验注册码（手改 JSON 伪造无效）；卸载软件不清除，重装后仍已注册
+- **Unregistered**: a prompt appears on every startup: "This software is unregistered. All rights reserved. Commercial use is prohibited. To register, please contact sshztx@outlook.com" — click "OK" to keep using it normally (prompt only); click "Enter Registration Code" to register on the spot
+- **Obtaining a registration code**: send the **institution/department name** to sshztx@outlook.com; the developer generates a registration code of the form `PXRD1-XXXX-XXXX-...` (offline HMAC-SHA256 algorithm, shared across the PolyXRD family of software)
+- **Entering a registration code**: menu bar "Help" → "Enter Registration Code (&R)…", just paste it; supports with/without prefix, arbitrary spaces and hyphens, and mixed case
+- **After registration**: the **far right of the status bar** shows "Registered: institution/department name", and no prompt appears on later startups; the same registration code can be used on multiple computers in the same institution (not machine-bound)
+- **Registration state**: stored in `%APPDATA%\PolyXRD\Registration\PolyXRD_Converter.json`; the registration code is re-validated on every startup (hand-editing the JSON to fake it has no effect); uninstalling the software does not clear it, so it remains registered after reinstallation
 
-## RAW 多厂商自动识别
+## Automatic detection of multi-vendor RAW
 
-| 厂商/格式 | 魔数 | 识别要点 |
+| Vendor / format | Magic number | Detection key points |
 |---|---|---|
-| 岛津 Shimadzu XRD | `Shimadzu XRD` | 私有容器：变长头 + **int32 LE** 强度。点数取头里 `u32@0x34 ÷ 4`（权威），数据起始 = `u32@0x30 + 56`（头长可变，有的文件把嵌入的源路径也算进头里）。起始/终止/步长为 `i32@0x12C/0x130/0x134 ×1e-4`（**有符号**，可支持 θ 负角扫描）。`0x20` 记录类型区分 `.RAW/.ORG/.RSM/.RBG/.RK1/.RAX/.RLZ/.RFI`（同结构，均可读）与 `PKR/PKK/PKS/PSE/PKF`（峰表，**明确拒绝**）。**截断防护**：声明数据区超出文件尾时钳到实际可用点数、标记 `truncated` 并高亮提示，绝不把头部字节当强度读入；截断文件的角度轴强制转人工指定 |
-| 理学 Rigaku (RINT/SmartLab) | `FI\x00\x00` | 定长 3162 字节头 + 变长 float32 强度，轴参数在 0xB92；点数双证据（n_axis vs n_fixed）一致性校验 |
-| Scintag RAW2 | `RAW2` | 316 字节头；点数(int16)@0x102、步长(float32)@0x10C、起始 2θ(float32)@0x110 |
-| Bruker/Siemens RAW v1 | `RAW1.01` / `RAW1.00` / `RAW ` | 定长字符串头 + 10 条 ×892 字节区间记录 + 末尾 float32 强度；轴按严格判据匹配（step 0.005~0.5°、span≥1°、end≤180°），匹配不上则标不可信 |
-| MDI / Jade 文本导出 | —（两行头） | 头行 `start step mode anode λ stop npoints`，单列定宽强度；靶材记号与波长交叉校验后才按头建轴 |
-| 未知 RAW | — | 兜底解析（最长可信 float32 后缀），轴一律标不可信 |
+| Shimadzu XRD | `Shimadzu XRD` | Private container: variable-length header + **int32 LE** intensities. Point count from `u32@0x34 ÷ 4` in the header (authoritative), data start = `u32@0x30 + 56` (header length varies; some files also count the embedded source path into the header). Start/end/step are `i32@0x12C/0x130/0x134 ×1e-4` (**signed**, supports negative θ scans). The `0x20` record type distinguishes `.RAW/.ORG/.RSM/.RBG/.RK1/.RAX/.RLZ/.RFI` (same structure, all readable) from `PKR/PKK/PKS/PSE/PKF` (peak tables, **explicitly rejected**). **Truncation guard**: when the declared data region extends past end of file, clamp to the actually usable point count, flag `truncated` and highlight the warning — never read header bytes as intensities; truncated files have their angle axis forced to manual specification |
+| Rigaku (RINT/SmartLab) | `FI\x00\x00` | Fixed 3162-byte header + variable-length float32 intensities, axis parameters at 0xB92; point count cross-checked by two pieces of evidence (n_axis vs n_fixed) for consistency |
+| Scintag RAW2 | `RAW2` | 316-byte header; point count (int16)@0x102, step (float32)@0x10C, start 2θ (float32)@0x110 |
+| Bruker/Siemens RAW v1 | `RAW1.01` / `RAW1.00` / `RAW ` | Fixed-length string header + 10 × 892-byte range records + trailing float32 intensities; the axis is matched by strict criteria (step 0.005~0.5°, span≥1°, end≤180°), and is marked untrustworthy if no match |
+| MDI / Jade text export | — (two-line header) | Header line `start step mode anode λ stop npoints`, single column of fixed-width intensities; the axis is built from the header only after the anode/target notation and wavelength are cross-checked |
+| Unknown RAW | — | Fallback parsing (longest plausible float32 suffix), axis always marked untrustworthy |
 
-> **设计原则**：解析器按"魔数分流 + 可信度标记"组织。头参数损坏（如 end > 180°、点数不自洽）时产出 `axis_confident=False`，GUI 高亮警告，转换被拦截，直到人工给出角度轴。
+> **Design principle**: the parser is organized around "magic-number dispatch + confidence marking". When header parameters are corrupted (e.g. end > 180°, inconsistent point count) it yields `axis_confident=False`, the GUI highlights a warning, and conversion is blocked until an angle axis is given manually.
 
-### 岛津容器的四种约定（都已处理）
+### Four conventions of the Shimadzu container (all handled)
 
-- **步长字段被截断**：`Std/Search.RAW` 头里写 0.0213，实际是 0.0212644（4 位小数截断）。点数自洽校验不过时，按 `(end − start)/(n − 1)` 反推步长。
-- **头里的 end 差一个步长**：部分样本 `end = start + step×n`（如 `Stress/Heikei-Test`：34.0 + 0.05×80 = 38.0 精确闭合），另一部分是 `start + step×(n−1)`。以头里 `0x34` 声明的点数与步长字段为准，两种约定都能接受——统一按 `(end−start)/(n−1)` 重排会在这一类文件上把轴拉伸出固件不可能的步长（如 0.05063291）。
-- **波长字段可能过期**：`Stress/std-sokkei.RAW` 靶材已是 Cr 但波长字段残留 Cu 1.5406 —— 以靶材元素记号查表为准。
-- **文件被截断**：头里声明的数据区装不进实际文件时（传输不完整等），钳到可用点数、标记 `truncated` 并在列表里高亮「文件不完整」；截断文件的 `end` 对应声明点数而非实际点数，角度轴不可信，须人工指定后才能转换。
+- **Step field truncated**: `Std/Search.RAW` has 0.0213 written in the header, but the actual value is 0.0212644 (truncated to 4 decimal places). When the point-count consistency check fails, the step is back-computed from `(end − start)/(n − 1)`.
+- **The end in the header is off by one step**: some samples use `end = start + step×n` (e.g. `Stress/Heikei-Test`: 34.0 + 0.05×80 = 38.0, exactly closed), others `start + step×(n−1)`. The point count declared at `0x34` in the header and the step field are authoritative, and both conventions are accepted — uniformly re-laying out by `(end−start)/(n−1)` would stretch the axis on this class of files into a step the firmware could never produce (e.g. 0.05063291).
+- **The wavelength field may be stale**: in `Stress/std-sokkei.RAW` the target is already Cr but the wavelength field still holds Cu 1.5406 — the target element symbol from the lookup table is authoritative.
+- **File truncated**: when the data region declared in the header does not fit in the actual file (incomplete transfer, etc.), clamp to the usable point count, flag `truncated` and highlight "File incomplete" in the list; for a truncated file `end` corresponds to the declared point count rather than the actual one, so the angle axis is untrustworthy and must be specified manually before conversion.
 
-## 使用
+## Usage
 
-### 图形界面
+### Graphical interface
 
-双击 `PolyXRD-Converter.exe`（或 `python main.py`）：
+Double-click `PolyXRD-Converter.exe` (or `python main.py`):
 
-1. 把文件/文件夹拖进窗口（或点「添加文件」）
-2. 表格自动识别每个文件的格式、点数、2θ 范围、最强峰强度
-3. 选中任一行即可在右侧预览谱图
-4. 选目标格式 + 输出目录 → 「开始转换」
-5. 切界面语言：菜单栏「语言」→ 简体中文 / English / 日本語，**即时生效**，无需重启
-6. 查看许可：菜单栏「帮助」→「版权」（与「关于」并列）弹出中英双语许可说明与联系方式
+1. Drag files/folders into the window (or click "Add Files")
+2. The table automatically detects each file's format, point count, 2θ range, and strongest peak intensity
+3. Select any row to preview the pattern on the right
+4. Choose the target format + output directory → "Start Conversion"
+5. Switch the UI language: menu bar "Language" → Simplified Chinese / English / Japanese, **takes effect immediately**, no restart
+6. View the license: menu bar "Help" → "Copyright" (alongside "About") opens a bilingual Chinese-English license notice and contact information
 
-带参启动（拖文件到 exe 图标上等效）：
+Launch with arguments (equivalent to dragging files onto the exe icon):
 
 ```
 PolyXRD-Converter.exe D:\data\spectrum.raw D:\data\another.xy
 ```
 
-### 命令行 / 作为库
+### Command line / as a library
 
 ```python
 from polyxrd_converter.loader import load_pattern
 from polyxrd_converter.converter import convert_file
 
-data = load_pattern("spectrum.raw")          # 自动识别格式
+data = load_pattern("spectrum.raw")          # auto-detect format
 print(len(data), data.two_theta[0], data.two_theta[-1])
 
-convert_file("spectrum.raw", "spectrum.xrdml")   # 单文件转换
+convert_file("spectrum.raw", "spectrum.xrdml")   # single-file conversion
 ```
 
-## 验证
+## Validation
 
-真实样本全量交叉校验（与同谱其它格式导出逐点比对）：
+Full cross-validation on real samples (point-by-point comparison against other-format exports of the same pattern):
 
 ```
-python tests/validate_samples.py     # 612 项断言
-python tests/smoke_gui.py            # GUI 离屏冒烟 65 项
-python tests/test_registration.py    # 注册机制 21 项 (纯 stdlib)
+python tests/validate_samples.py     # 612 assertions
+python tests/smoke_gui.py            # GUI off-screen smoke 65 items
+python tests/test_registration.py    # registration mechanism 21 items (pure stdlib)
 ```
 
-覆盖：
-- **岛津**：`XRData/Shimadzu Data` 72 个 `.RAW` 全解析成功（角度轴全部可信），其中 5 组与厂商官方 ASCII 导出逐点比对 —— **强度完全相等**、2θ 差 <3e-14；含 5 个边界样本回归（负角 θ 扫描、步长截断、end 差一步长、Cr 靶、变长头）与峰表拒绝、合成截断文件回归
-- **岛津全量对拍（v1.1.0）**：`XRData` 全库 305 个岛津容器文件（含 1608/976 字节变长头子类型）解析成功，其中 26 个真实截断文件正确标记并拦截；与 PolyXRD 主体 `DataLoader._load_shimadzu_raw` 逐点对拍 206 个文件，**强度全等**；`smz geshi` 13 对 `.RAW`↔PCXRD ASCII 导出逐点对拍（含 θ 单轴摇摆扫描），强度全等、2θ 差 <1.5e-14
-- **理学**：Rigaku FI 39 个（与 `.txt` 逐点一致）
-- **Scintag**：RAW2 33 个（与 `.dat/.txt/.xy` 逐点全等）
-- **Bruker**：RAW v1 轴损坏样本正确拦截
-- **Jade**：文本导出按头建轴 + 峰位交叉
-- **GSAS-II 系文本格式**：`.gsas/.fxye`（FXYE/FXY/ESD/STD）、FullProf `.dat`、Rigaku `.ras/.rasx`、Topas `.xye/.qye`、Fit2D `.chi/.qchi` 合成样本全格式回归，并以 GSAS-II 本体（Argonne 开源参考实现）做 oracle 逐点对拍 —— 10 种格式与 GSAS-II 完全一致，4 项跳过均为 GSAS-II 自身缺陷（STD `int()` 崩溃、Fit2D 头误入 pyFAI 分支等），本实现均规避
-- 8 种格式往返守恒
-- **三语一致性（v1.5.0）**：141 条文案 × 3 语言的 key 集合齐平、占位符同名同数量、每条都能 `format` 通过；读取/写出格式名在三种语言下均有译文；抽取按钮/菜单/「关于」等 7 条做「三语互不相同」守卫（防整表复制没改）。另有 3 项针对 UI 的冒烟断言：切到 ja/en/zh 后按钮、表头、菜单栏、目标格式下拉、已载入行的「识别格式」列全部即时重译
-- **注册机制（v1.5.0）**：出码-验码 21 项（中英单位名往返、输入容错、篡改拒绝、状态文件防伪造、三语状态文案）；GUI 冒烟 12 项（未注册提示流程、注册后状态栏显示单位名并随语言即时重译、内部评估版无注册菜单且显示「内部评估版本」）
-- **内部评估版状态栏（v1.5.1）**：冒烟新增 3 项 —— 提示文字水平居中（`AlignHCenter`）、字体加粗、样式为红色 `#ff0000`；另在原生 Windows 渲染下实测 900 / 1100 / 1600 三种窗口宽度，红字实际渲染中心与状态栏几何中心偏差恒为 **+0.5px**（QStatusBar 为右下 size grip 预留的宽度已用标签左边距补偿，预留宽度由几何差反推，离屏 24px / 原生 20px 均自适应）；加粗经 A/B 渲染验证（同字号下红像素 209 → 338），字号仍为全局 9.5pt 未变
+Coverage:
+- **Shimadzu**: all 72 `.RAW` files in `XRData/Shimadzu Data` parsed successfully (all angle axes trustworthy), of which 5 groups were compared point-by-point with the vendor's official ASCII export — **intensities exactly equal**, 2θ difference <3e-14; includes regression on 5 boundary samples (negative θ scan, truncated step, end off by one step, Cr target, variable-length header) plus peak-table rejection and synthetic truncated-file regression
+- **Full Shimadzu cross-check (v1.1.0)**: all 305 Shimadzu container files in the `XRData` library (including 1608/976-byte variable-length header subtypes) parsed successfully, of which 26 genuinely truncated files were correctly flagged and blocked; 206 files cross-checked point-by-point against PolyXRD's main `DataLoader._load_shimadzu_raw`, **intensities all equal**; `smz geshi` 13 pairs of `.RAW`↔PCXRD ASCII exports cross-checked point-by-point (including θ single-axis rocking scans), intensities all equal, 2θ difference <1.5e-14
+- **Rigaku**: 39 Rigaku FI files (point-by-point identical to `.txt`)
+- **Scintag**: 33 RAW2 files (point-by-point all equal to `.dat/.txt/.xy`)
+- **Bruker**: RAW v1 samples with corrupted axes correctly blocked
+- **Jade**: text export builds the axis from the header + peak-position cross-check
+- **GSAS-II family text formats**: `.gsas/.fxye` (FXYE/FXY/ESD/STD), FullProf `.dat`, Rigaku `.ras/.rasx`, Topas `.xye/.qye`, Fit2D `.chi/.qchi` — full-format regression on synthetic samples, and point-by-point oracle cross-check against GSAS-II itself (Argonne's open-source reference implementation) — 10 formats fully consistent with GSAS-II, the 4 skips are all GSAS-II's own defects (STD `int()` crash, Fit2D header misrouted into the pyFAI branch, etc.), all avoided by this implementation
+- Round-trip conservation for 8 formats
+- **Trilingual consistency (v1.5.0)**: 141 text entries × 3 languages have aligned key sets, placeholders with the same names and counts, and every entry passes `format`; read/write format names have translations in all three languages; 7 entries (buttons/menu/"About" etc.) are guarded by a "all three languages must differ" check (to catch a whole copied table left unchanged). Plus 3 UI smoke assertions: after switching to ja/en/zh, buttons, table headers, the menu bar, the target-format dropdown, and the "Detected format" column of loaded rows are all re-translated immediately
+- **Registration mechanism (v1.5.0)**: 21 items for code generation/validation (Chinese/English unit-name round-trip, input tolerance, tamper rejection, state-file anti-forgery, trilingual status text); 12 GUI smoke items (unregistered prompt flow, status bar showing the unit name after registration and re-translating immediately with the language, internal evaluation build having no registration menu and showing "Internal Evaluation Version")
+- **Internal evaluation build status bar (v1.5.1)**: 3 new smoke items — the prompt text horizontally centered (`AlignHCenter`), bold font, and red style `#ff0000`; also measured under native Windows rendering at three window widths 900 / 1100 / 1600, the deviation between the red text's actual rendered center and the status bar's geometric center is consistently **+0.5px** (the width QStatusBar reserves for the bottom-right size grip is compensated by the label's left margin; the reserved width is back-derived from the geometric difference, self-adapting for both off-screen 24px / native 20px); boldness verified by A/B rendering (red pixels 209 → 338 at the same font size), font size still the global 9.5pt, unchanged
 
-## 文档
+## Documentation
 
-- [`docs/交接记录-HANDOVER.md`](docs/交接记录-HANDOVER.md) —— **项目转交记录**：项目定位、模块分层、RAW 解析器注册表、验收矩阵与真值来源、版本进展、24 条踩坑经验、已知问题（接手开发 / 协作模型必读）
+- [Project handover record (Chinese)](docs/交接记录-HANDOVER.md) — **Project handover record**: project positioning, module layering, RAW parser registry, acceptance matrix and ground-truth sources, version progress, 24 lessons learned, known issues (required reading for taking over development / collaboration model)
 
-## 开发
+## Development
 
 ```bash
 python -m venv venv
 venv\Scripts\pip install -e . pyinstaller
-python main.py                 # 源码运行
-build.bat                      # 双形态打包: Internal 单文件 + Setup 安装包 (需 Inno Setup 6)
+python main.py                 # run from source
+build.bat                      # dual-edition packaging: Internal single-file + Setup installer (requires Inno Setup 6)
 ```
 
-### 加一种新语言
+### Adding a new language
 
-在 `src/polyxrd_converter/i18n.py` 里加一张与 `ZH` 同 key 的表、把它挂进 `_LANGS` 与 `LANGS` 即可，语言菜单自动生成。
-key 集合与占位符的一致性由 `tests/validate_samples.py::validate_i18n` 把关（漏 key 时 `tr()` 会静默回退中文）。
+Add a table with the same keys as `ZH` in `src/polyxrd_converter/i18n.py` and hook it into `_LANGS` and `LANGS`; the language menu is then generated automatically.
+Consistency of the key set and placeholders is enforced by `tests/validate_samples.py::validate_i18n` (a missing key makes `tr()` silently fall back to Chinese).
 
-## 依赖
+## Dependencies
 
-运行仅需 `numpy` + `PySide6`（预览用 QPainter 手绘，刻意不引入 matplotlib/pyqtgraph，控制单文件体积与启动速度）。
+Runtime requires only `numpy` + `PySide6` (the preview is hand-drawn with QPainter; matplotlib/pyqtgraph are deliberately not introduced to keep the single-file size and startup speed down).
 
-## 许可
+## License
 
-版权所有 (c) 2026 PolyXRD Team。
+Copyright (c) 2026 PolyXRD Team.
 
-本软件可供学术研究与教学免费使用。
-未经版权持有人单独书面许可，禁止用于商业用途。
-软件按原样提供，不提供任何担保。
+This software may be used free of charge for academic research and teaching.
+Commercial use is prohibited without separate written permission from the copyright holder.
+The software is provided as-is, without any warranty.
 
-完整条款见 [`LICENSE`](LICENSE)（英文）与 [`LICENSE-CN`](LICENSE-CN)（中文）；商业授权联系：sshztx@outlook.com。
-使用时请同时遵守上游 PySide6 (LGPL/GPL)、numpy (BSD) 等第三方许可证条款。
+See the full terms in [`LICENSE`](LICENSE) (English) and [`LICENSE-CN`](LICENSE-CN) (Chinese); for commercial licensing contact: sshztx@outlook.com.
+When using it, please also comply with the upstream third-party license terms of PySide6 (LGPL/GPL), numpy (BSD), etc.
 
 ---
 
 <div align="right">
-  <i>PolyXRD Team · 2025 — 2026 · 联系：sshztx@outlook.com</i>
+  <i>PolyXRD Team · 2025 — 2026 · Contact: sshztx@outlook.com</i>
 </div>
